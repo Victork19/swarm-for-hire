@@ -1,0 +1,42 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+.near-credentials/
+near-credentials/
+*.pem
+*.key
+*.seed
+*secret*
+*private*
+wallet.json
+access-key.json
+
+# Rust / NEAR build output
+target/
+*.wasm
+
+# JavaScript dependencies and build output
+node_modules/
+dist/
+build/
+.parcel-cache/
+.cache/
+
+# Logs and local runtime output
+*.log
+logs/
+coverage/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local demo artifacts
+demo-output/
+screenshots/
+recordings/
