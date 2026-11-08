@@ -4,7 +4,7 @@ Implementation scaffold for `SWARM-TDD-001`, a deterministic two-agent bounty de
 
 ## Do X → See Y
 
-Open https://swarm-demo.pages.dev  
+Open https://swarmforhire.pages.dev  
 Connect wallet (or use demo mode)  
 Click “Create Demo Bounty”  
    → See new bounty appear with 5 NEAR budget  
