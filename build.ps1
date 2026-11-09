@@ -17,6 +17,7 @@ if (-not $env:VCToolsInstallDir) { throw 'MSVC environment could not be loaded.'
 Push-Location $root
 try {
   $env:Path = "$cargoBin;$env:Path"
+  $env:RUSTFLAGS = '--cfg near'
   rustup target add wasm32-unknown-unknown
   cargo build --manifest-path .\contract\Cargo.toml --target wasm32-unknown-unknown --release
   if ($LASTEXITCODE -ne 0) { throw 'WASM contract build failed.' }

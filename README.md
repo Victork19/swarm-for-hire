@@ -1,36 +1,60 @@
 # Swarm-for-Hire
 
-Implementation scaffold for `SWARM-TDD-001`, a deterministic two-agent bounty demo on NEAR testnet.
+Swarm-for-Hire is a deterministic NEAR bounty market: one brief, two AI agents, TEE-attested outputs, and on-chain settlement for the highest-scoring result.
 
-## Do X → See Y
+**Live demo:** https://swarmforhire.pages.dev
+**Contract:** `swarm-bounty.swarmbuilder.testnet`
+**Primary track:** AI Swarms
+**Secondary fit:** Agent Economy, Privacy & Private AI
 
-Open https://swarmforhire.pages.dev  
-Connect wallet (or use demo mode)  
-Click “Create Demo Bounty”  
-   → See new bounty appear with 5 NEAR budget  
-Click “Run Agents”  
-   → See two agents join and submit (attestations appear)  
-Click “Settle”  
-   → See agent1 marked as winner and balance increased
+## Do X -> See Y
 
-## Run locally
+1. Open https://swarmforhire.pages.dev
+2. Click **Create Demo Bounty** -> see a 5 NEAR bounty.
+3. Click **Run Agents** -> see two agents, scores, and deterministic demo attestations.
+4. Click **Settle** -> see `agent1.swarmbuilder.testnet` highlighted with a 4 NEAR payout.
 
-Open `frontend/index.html` directly, or serve this directory with any static server. The default demo mode is deterministic and requires no wallet. Set `window.SWARM_CONFIG.mode = 'near'` before loading to wire the page to the deployed contract.
+The public UI runs in deterministic demo mode for a reliable recording. The on-chain path is live on NEAR testnet and was verified with bounty 0. The worker quote is intentionally labeled demo data; production deployment must replace it with a real NEAR AI Cloud attestation verifier.
 
-On Windows, run `powershell -ExecutionPolicy Bypass -File .\demo.ps1` for the full testnet demo. `demo.sh` is the equivalent Git Bash/WSL script.
+## Reproduce the testnet demo
 
-## Contract
+Windows PowerShell:
 
-```sh
-cd contract
-cargo near build
+```powershell
+powershell -ExecutionPolicy Bypass -File .\demo.ps1
 ```
 
-On Windows, run `powershell -ExecutionPolicy Bypass -File .\build.ps1` from the project root. This produces `target/wasm32-unknown-unknown/release/swarm_bounty.wasm` directly with Rust’s WASM target. After the contract account exists and is funded, install/configure the NEAR CLI and run `deploy.ps1` to deploy and initialize `swarm-bounty.hackathon.testnet`.
+Git Bash or WSL:
 
-The contract uses `swarm-bounty.hackathon.testnet` as its intended deployment account. `demo.sh` documents the exact testnet transaction path and validates the winner.
+```bash
+bash ./demo.sh
+```
 
-## Demo assumptions
+The Windows script uses `demo-args/` files because PowerShell strips JSON property quotes when passed inline. Set `SWARM_BOUNTY_ID` when replaying against a later bounty id.
 
-The worker uses fixed output and a pre-generated-looking quote in demo mode. A production deployment must replace it with the NEAR AI Cloud attestation adapter and real key management.
-# swarm-for-hire
+## Build and deploy
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build.ps1
+powershell -ExecutionPolicy Bypass -File .\deploy.ps1
+```
+
+The build produces `target/wasm32-unknown-unknown/release/swarm_bounty.wasm`. The deployment account is `swarm-bounty.swarmbuilder.testnet`.
+
+## Contract surface
+
+- `create_bounty(description, deadline_seconds)`
+- `join_bounty(bounty_id)` with a 0.5 NEAR minimum stake
+- `submit_output(bounty_id, output_hash, attestation, score)`
+- `settle(bounty_id)` after two submissions or the deadline
+- `get_bounty`, `get_agents`, `get_min_stake`, `get_next_bounty_id`
+
+The contract pays 80% of the bounty budget to the highest score, refunds 50% of every non-winning joined stake, and breaks score ties by earliest submission.
+
+## Worker
+
+`worker/worker.py` is a deterministic demo worker. It hashes the fixed output and returns a demo quote. `worker/Dockerfile` documents the container entrypoint. A live NEAR AI Cloud deployment must inject real quote generation and verification.
+
+## Hackathon submission
+
+Publish this repository, post the demo on X with `@NEARProtocol` and `#NEARHackathon`, then submit both links before 2026-11-14 23:59 UTC.

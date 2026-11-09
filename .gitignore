@@ -18,6 +18,7 @@ target/
 
 # JavaScript dependencies and build output
 node_modules/
+__pycache__/
 dist/
 build/
 .parcel-cache/

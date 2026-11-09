@@ -114,7 +114,7 @@ impl Contract {
         let winner = submissions.iter().max_by(|a, b| a.1.score.unwrap_or(0).cmp(&b.1.score.unwrap_or(0)).then_with(|| b.1.submitted_at.unwrap_or(u64::MAX).cmp(&a.1.submitted_at.unwrap_or(u64::MAX)))).unwrap().0.clone();
         let payout = bounty.budget * 80 / 100;
         let _ = Promise::new(winner.clone()).transfer(near_sdk::NearToken::from_yoctonear(payout));
-        for (account, agent) in &submissions { if *account != winner { let _ = Promise::new(account.clone()).transfer(near_sdk::NearToken::from_yoctonear(agent.stake / 2)); } }
+        for (account, agent) in bounty.agents.iter() { if account != winner { let _ = Promise::new(account).transfer(near_sdk::NearToken::from_yoctonear(agent.stake / 2)); } }
         bounty.status = BountyStatus::Settled; bounty.winner = Some(winner.clone()); self.bounties.insert(&bounty_id, &bounty);
         env::log_str(&format!("BountySettled {{id:{}, winner:{}, payout:{}}}", bounty_id, winner, payout));
     }
@@ -122,4 +122,36 @@ impl Contract {
     pub fn get_bounty(&self, bounty_id: u64) -> Option<BountyView> { self.bounties.get(&bounty_id).map(|b| BountyView { id:b.id, creator:b.creator, budget:U128(b.budget), description:b.description, created_at:b.created_at, deadline:b.deadline, status:b.status, winner:b.winner, agent_count:b.agents.len() as u32 }) }
     pub fn get_agents(&self, bounty_id: u64) -> Vec<AgentView> { self.bounties.get(&bounty_id).map(|b| b.agents.iter().map(|(account,a)| AgentView { account, stake:U128(a.stake), joined_at:a.joined_at, output_hash:a.output_hash, attestation:a.attestation, submitted_at:a.submitted_at, score:a.score }).collect()).unwrap_or_default() }
     pub fn get_min_stake(&self) -> U128 { U128(self.min_stake) }
+    pub fn get_next_bounty_id(&self) -> u64 { self.next_bounty_id }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use near_sdk::test_utils::VMContextBuilder;
+    use near_sdk::{testing_env, NearToken};
+
+    fn account(name: &str) -> AccountId { name.parse().unwrap() }
+    fn context(predecessor: &str, deposit: u128, timestamp: u64) -> near_sdk::VMContext {
+        VMContextBuilder::new().current_account_id(account("swarm.testnet")).predecessor_account_id(account(predecessor)).attached_deposit(NearToken::from_yoctonear(deposit)).block_timestamp(timestamp).build()
+    }
+
+    #[test]
+    fn creates_bounty_and_advances_id() {
+        testing_env!(context("creator.testnet", YOCTO_NEAR * 5, 1));
+        let mut contract = Contract::new();
+        assert_eq!(contract.create_bounty("brief".into(), 3600), 0);
+        assert_eq!(contract.get_next_bounty_id(), 1);
+        assert_eq!(contract.get_bounty(0).unwrap().budget.0, YOCTO_NEAR * 5);
+    }
+
+    #[test]
+    fn agent_can_join_once_with_minimum_stake() {
+        testing_env!(context("creator.testnet", YOCTO_NEAR * 5, 1));
+        let mut contract = Contract::new();
+        contract.create_bounty("brief".into(), 3600);
+        testing_env!(context("agent.testnet", MIN_STAKE, 2));
+        contract.join_bounty(0);
+        assert_eq!(contract.get_agents(0).len(), 1);
+    }
 }
