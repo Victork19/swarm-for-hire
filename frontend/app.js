@@ -36,17 +36,23 @@ async function liveView(method, args) { const payload = { jsonrpc: '2.0', id: 's
 
 async function refreshLive() {
   try {
-    const [bounty, agents] = await Promise.all([liveView('get_bounty', { bounty_id: 0 }), liveView('get_agents', { bounty_id: 0 })]);
-    if (!bounty) throw new Error('No bounty exists yet');
-    state.bounties = [{ id: bounty.id, budget: Number(bounty.budget) / 1e24, description: bounty.description, status: bounty.status, winner: bounty.winner, agents: agents.map((agent) => ({ account: agent.account, stake: Number(agent.stake) / 1e24, submitted: Boolean(agent.output_hash), score: agent.score, attestation: agent.attestation })) }];
-    state.selected = bounty.id; renderList(); renderDetail();
+    const bounties = await liveView('get_bounties', {});
+    state.bounties = await Promise.all(bounties.map(async (bounty) => ({ id: bounty.id, budget: Number(bounty.budget) / 1e24, description: bounty.description, status: bounty.status, winner: bounty.winner, agents: (await liveView('get_agents', { bounty_id: bounty.id })).map((agent) => ({ account: agent.account, stake: Number(agent.stake) / 1e24, submitted: Boolean(agent.output_hash), score: agent.score, attestation: agent.attestation })) })));
+    if (state.bounties.length && state.selected === null) state.selected = state.bounties[state.bounties.length - 1].id;
+    renderList(); renderDetail();
   } catch (error) { renderList(); toast(`Market read failed: ${error.message}`); }
 }
 
-async function connectWallet() {
+async function getWallet() {
   if (!window.nearApi) { toast('Wallet library is still loading'); return; }
-  const near = await nearApi.connect({ networkId: 'testnet', nodeUrl: RPC, walletUrl: 'https://wallet.testnet.near.org', helperUrl: 'https://helper.testnet.near.org', explorerUrl: 'https://explorer.testnet.near.org' });
+  const near = await nearApi.connect({ networkId: 'testnet', nodeUrl: RPC, walletUrl: 'https://wallet.testnet.near.org', helperUrl: 'https://helper.testnet.near.org', explorerUrl: 'https://explorer.testnet.near.org', keyStore: new nearApi.keyStores.BrowserLocalStorageKeyStore() });
   const wallet = new nearApi.WalletConnection(near, 'swarm-for-hire');
+  return wallet;
+}
+
+async function connectWallet() {
+  const wallet = await getWallet();
+  if (!wallet) return;
   if (!wallet.isSignedIn()) { wallet.requestSignIn({ contractId: CONTRACT, methodNames: ['create_bounty', 'join_bounty', 'submit_output', 'settle'] }); return; }
   state.wallet = wallet; state.walletAccount = wallet.getAccountId(); el('wallet-btn').textContent = state.walletAccount; el('product-status').textContent = `Connected as ${state.walletAccount}. Create a real bounty on NEAR testnet.`; toast('Testnet wallet connected');
 }
@@ -63,7 +69,7 @@ async function settleLive() {
 
 function runShowcase() { state.bounties = [{ id: 0, budget: 5, description: 'Summarize NEAR Intents 30-day volume with a clear, evidence-backed readout.', status: 'Open', agents: [] }]; state.selected = 0; renderList(); renderDetail(); window.setTimeout(() => { state.bounties[0].agents = demoAgents.map((agent) => ({ ...agent })); renderList(); renderDetail(); toast('Showcase workers returned attested output'); }, 900); window.setTimeout(() => { state.bounties[0].status = 'Settled'; state.bounties[0].winner = AGENT1; renderList(); renderDetail(); toast('Showcase settlement completed'); }, 1800); }
 
-el('wallet-btn').addEventListener('click', connectWallet);
+el('wallet-btn').addEventListener('click', () => connectWallet().catch((error) => toast(`Wallet connection failed: ${error.message}`)));
 if (!showcase) el('create-btn').addEventListener('click', createLive);
 el('showcase-btn').addEventListener('click', () => { if (showcase) { location.href = location.pathname; return; } location.href = `${location.pathname}?mode=showcase`; });
-if (showcase) { el('mode-label').textContent = 'SHOWCASE MODE'; el('showcase-btn').textContent = 'Back to live market'; el('create-btn').textContent = 'Run showcase'; el('create-btn').addEventListener('click', runShowcase); el('product-status').textContent = 'Deterministic walkthrough. No wallet or funds required.'; runShowcase(); } else { renderList(); refreshLive(); }
+if (showcase) { el('mode-label').textContent = 'SHOWCASE MODE'; el('showcase-btn').textContent = 'Back to live market'; el('create-btn').textContent = 'Run showcase'; el('create-btn').addEventListener('click', runShowcase); el('product-status').textContent = 'Deterministic walkthrough. No wallet or funds required.'; runShowcase(); } else { renderList(); refreshLive(); getWallet().then((wallet) => { if (wallet && wallet.isSignedIn()) { state.wallet = wallet; state.walletAccount = wallet.getAccountId(); el('wallet-btn').textContent = state.walletAccount; el('product-status').textContent = `Connected as ${state.walletAccount}. Create a real bounty on NEAR testnet.`; } }).catch((error) => toast(`Wallet setup failed: ${error.message}`)); }

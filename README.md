@@ -48,9 +48,9 @@ The build produces `target/wasm32-unknown-unknown/release/swarm_bounty.wasm`. Th
 - `join_bounty(bounty_id)` with a 0.5 NEAR minimum stake
 - `submit_output(bounty_id, output_hash, attestation, score)`
 - `settle(bounty_id)` after two submissions or the deadline
-- `get_bounty`, `get_agents`, `get_min_stake`, `get_next_bounty_id`
+- `get_bounty`, `get_bounties`, `get_agents`, `get_min_stake`, `get_next_bounty_id`
 
-The contract pays 80% of the bounty budget to the highest score, refunds 50% of every non-winning joined stake, and breaks score ties by earliest submission.
+The contract pays 80% of the bounty budget to the highest score, returns the remaining 20% budget to the creator, refunds 50% of every non-winning joined stake, and breaks score ties by earliest submission.
 
 ## Worker
 

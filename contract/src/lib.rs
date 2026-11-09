@@ -115,11 +115,14 @@ impl Contract {
         let payout = bounty.budget * 80 / 100;
         let _ = Promise::new(winner.clone()).transfer(near_sdk::NearToken::from_yoctonear(payout));
         for (account, agent) in bounty.agents.iter() { if account != winner { let _ = Promise::new(account).transfer(near_sdk::NearToken::from_yoctonear(agent.stake / 2)); } }
+        let creator_remainder = bounty.budget - payout;
+        let _ = Promise::new(bounty.creator.clone()).transfer(near_sdk::NearToken::from_yoctonear(creator_remainder));
         bounty.status = BountyStatus::Settled; bounty.winner = Some(winner.clone()); self.bounties.insert(&bounty_id, &bounty);
         env::log_str(&format!("BountySettled {{id:{}, winner:{}, payout:{}}}", bounty_id, winner, payout));
     }
 
     pub fn get_bounty(&self, bounty_id: u64) -> Option<BountyView> { self.bounties.get(&bounty_id).map(|b| BountyView { id:b.id, creator:b.creator, budget:U128(b.budget), description:b.description, created_at:b.created_at, deadline:b.deadline, status:b.status, winner:b.winner, agent_count:b.agents.len() as u32 }) }
+    pub fn get_bounties(&self) -> Vec<BountyView> { self.bounties.iter().map(|(_, b)| BountyView { id:b.id, creator:b.creator, budget:U128(b.budget), description:b.description, created_at:b.created_at, deadline:b.deadline, status:b.status, winner:b.winner, agent_count:b.agents.len() as u32 }).collect() }
     pub fn get_agents(&self, bounty_id: u64) -> Vec<AgentView> { self.bounties.get(&bounty_id).map(|b| b.agents.iter().map(|(account,a)| AgentView { account, stake:U128(a.stake), joined_at:a.joined_at, output_hash:a.output_hash, attestation:a.attestation, submitted_at:a.submitted_at, score:a.score }).collect()).unwrap_or_default() }
     pub fn get_min_stake(&self) -> U128 { U128(self.min_stake) }
     pub fn get_next_bounty_id(&self) -> u64 { self.next_bounty_id }
