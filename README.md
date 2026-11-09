@@ -54,7 +54,12 @@ The contract pays 80% of the bounty budget to the highest score, returns the rem
 
 ## Worker
 
-`worker/worker.py` is a deterministic demo worker. It hashes the fixed output and returns a demo quote. `worker/Dockerfile` documents the container entrypoint. A live NEAR AI Cloud deployment must inject real quote generation and verification.
+`worker/worker.py` has two explicit paths:
+
+- `DEMO_MODE=1`: deterministic output for the recorded showcase, labeled `demo_only`.
+- `DEMO_MODE=0`: calls NEAR AI Cloud, requests nonce-bound gateway/model evidence, retrieves the response signature, and returns the evidence bundle labeled `evidence_collected_unverified` until the official verifier passes it.
+
+The project follows NEAR AI Cloud's documented verification model: fresh nonce-bound evidence, exact request/response hashes, signature-kind handling, and model/gateway signer matching. The official verifier still needs to be run as a deployment gate before a response is labeled verified.
 
 ## Hackathon submission
 

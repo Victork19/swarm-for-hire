@@ -35,6 +35,12 @@
   font: 10px var(--mono);
 }
 
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
 .primary:focus-visible,
 .text-btn:focus-visible,
 .wallet-btn:focus-visible,

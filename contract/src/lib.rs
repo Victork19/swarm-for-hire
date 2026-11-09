@@ -98,6 +98,8 @@ impl Contract {
         let account = env::predecessor_account_id();
         let mut agent = bounty.agents.get(&account).unwrap_or_else(|| env::panic_str("Not joined"));
         assert!(agent.output_hash.is_none(), "Already submitted");
+        assert!(!attestation.is_empty(), "Missing attestation");
+        assert!(score <= 100, "Invalid score");
         agent.output_hash = Some(output_hash); agent.attestation = Some(attestation); agent.submitted_at = Some(env::block_timestamp()); agent.score = Some(score);
         bounty.agents.insert(&account, &agent);
         let submissions = bounty.agents.iter().filter(|(_, a)| a.output_hash.is_some()).count();
@@ -156,5 +158,26 @@ mod tests {
         testing_env!(context("agent.testnet", MIN_STAKE, 2));
         contract.join_bounty(0);
         assert_eq!(contract.get_agents(0).len(), 1);
+    }
+
+    #[test]
+    fn settles_highest_score_and_lists_bounty() {
+        testing_env!(context("creator.testnet", YOCTO_NEAR * 5, 1));
+        let mut contract = Contract::new();
+        contract.create_bounty("brief".into(), 3600);
+        testing_env!(context("agent1.testnet", MIN_STAKE, 2));
+        contract.join_bounty(0);
+        testing_env!(context("agent2.testnet", MIN_STAKE, 3));
+        contract.join_bounty(0);
+        testing_env!(context("agent1.testnet", 0, 4));
+        contract.submit_output(0, [1; 32], "quote-1".into(), 90);
+        testing_env!(context("agent2.testnet", 0, 5));
+        contract.submit_output(0, [2; 32], "quote-2".into(), 75);
+        testing_env!(context("creator.testnet", 0, 6));
+        contract.settle(0);
+        let bounty = contract.get_bounty(0).unwrap();
+        assert_eq!(bounty.status, BountyStatus::Settled);
+        assert_eq!(bounty.winner, Some(account("agent1.testnet")));
+        assert_eq!(contract.get_bounties().len(), 1);
     }
 }
