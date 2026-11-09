@@ -46,7 +46,10 @@ def live_result(request):
 
     nonce = secrets.token_hex(32)
     query = urllib.parse.urlencode({"signing_algo": "ecdsa", "nonce": nonce, "model": MODEL, "provider": "near"})
-    evidence, _ = request_json(f"{GATEWAY}/v1/attestation/report?{query}", headers={"Accept": "application/json", "Authorization": f"Bearer {api_key}", "x-no-aliasing": "true"})
+    # NEAR AI Cloud documents the attestation preflight as keyless. Keeping
+    # the API key out of this request avoids validating it before the actual
+    # model call and preserves the preflight's intended security boundary.
+    evidence, _ = request_json(f"{GATEWAY}/v1/attestation/report?{query}", headers={"Accept": "application/json", "x-no-aliasing": "true"})
     prompt = request.get("description", "Complete the assigned bounty.")
     request_body = json.dumps({"model": MODEL, "messages": [{"role": "user", "content": prompt}], "stream": False}, separators=(",", ":")).encode()
     response, response_headers = request_json(f"{GATEWAY}/v1/chat/completions", method="POST", headers={"Accept": "application/json", "Content-Type": "application/json", "Authorization": f"Bearer {api_key}", "x-no-aliasing": "true", "Accept-Encoding": "identity"}, body=request_body)
