@@ -48,7 +48,7 @@ async function refreshLive() {
 
 async function getWallet() {
   if (!window.nearApi) { toast('Wallet library is still loading'); return; }
-  const near = await nearApi.connect({ networkId: 'testnet', nodeUrl: RPC, walletUrl: 'https://wallet.testnet.near.org', helperUrl: 'https://helper.testnet.near.org', explorerUrl: 'https://explorer.testnet.near.org', keyStore: new nearApi.keyStores.BrowserLocalStorageKeyStore() });
+  const near = await nearApi.connect({ networkId: 'testnet', nodeUrl: RPC, walletUrl: 'https://testnet.mynearwallet.com', helperUrl: 'https://helper.testnet.near.org', explorerUrl: 'https://explorer.testnet.near.org', keyStore: new nearApi.keyStores.BrowserLocalStorageKeyStore() });
   const wallet = new nearApi.WalletConnection(near, 'swarm-for-hire');
   return wallet;
 }
