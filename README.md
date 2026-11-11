@@ -5,7 +5,9 @@ Swarm-for-Hire is a NEAR testnet marketplace for agent work: one brief, two AI a
 **Live demo:** https://swarmforhire.pages.dev
 **Contract:** `swarm-bounty.swarmbuilder.testnet`
 **Primary track:** AI Swarms
-**Secondary fit:** Agent Economy, Privacy & Private AI
+**Secondary fit:** Privacy & Private AI
+
+**Tracks to submit:** `swarms`, `privacy`
 
 ## Product walkthrough
 
@@ -60,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\demo.ps1 -StorageReserve 4 -ReserveAc
 
 The script discovers the next bounty ID automatically. Use `-SkipCreate -BountyId 1` to replay an existing bounty.
 
+## Reproduce the swarm simulation
+
+The market simulation runs without an API key or wallet. It models 20 deterministic worker agents, 5 task rounds, eligible bids, quality ranking, runner-up selection, and clearing prices:
+
+```powershell
+python .\simulation\simulate.py
+```
+
+The rules and sequence diagram are in [RULES.md](RULES.md). The fixed seed makes the output reproducible for judges.
+
 ## Build and deploy
 
 ```powershell
@@ -97,6 +109,14 @@ $env:NEAR_AI_MAX_TOKENS = "300"
 '{"bounty_id":1,"description":"Return a concise, source-grounded summary of the supplied task data.","agent_account":"agent1.swarmbuilder.testnet"}' | python .\worker\worker.py
 ```
 
+Run the structural evidence preflight without mislabeling it as cryptographic verification:
+
+```powershell
+$result | ConvertTo-Json -Compress | python .\worker\verify_evidence.py
+```
+
+The preflight checks the nonce, model, gateway evidence, response-signature fields, and output hash. Full cryptographic verification still belongs to the official [NEAR AI verification example](https://github.com/near-examples/nearai-cloud-verification-example) and [NEAR AI verifier](https://github.com/nearai/nearai-cloud-verifier).
+
 ## Hackathon submission
 
 Publish this repository, post the demo on X with `@NEARProtocol` and `#NEARHackathon`, then submit both links before 2026-11-14 23:59 UTC.
@@ -104,3 +124,5 @@ Publish this repository, post the demo on X with `@NEARProtocol` and `#NEARHacka
 ## Verification status
 
 The testnet contract lifecycle has been exercised end-to-end on bounty `1`: two agents joined, both live NEAR AI outputs were submitted, and `agent1.swarmbuilder.testnet` won with a 4 NEAR payout. The browser UI reads the deployed contract but does not run agent workers itself; worker execution is intentionally kept as a separate auditable service/CLI path for this hackathon scope.
+
+The current on-chain path is intentionally a two-agent settlement slice. The offline simulation demonstrates the larger coordination-market direction without pretending that 20 agents are already deployed on-chain.

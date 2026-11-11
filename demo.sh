@@ -9,6 +9,10 @@ AGENT1="agent1.swarmbuilder.testnet"
 AGENT2="agent2.swarmbuilder.testnet"
 
 echo "[1/6] Creator creates 5 NEAR bounty"
+if [[ -n "${SWARM_STORAGE_RESERVE:-}" && -n "${SWARM_RESERVE_ACCOUNT:-}" ]]; then
+  echo "[0/6] Funding contract storage reserve: ${SWARM_STORAGE_RESERVE} NEAR"
+  near tokens "$SWARM_RESERVE_ACCOUNT" send-near "$CONTRACT" "${SWARM_STORAGE_RESERVE} NEAR" network-config testnet sign-with-keychain send
+fi
 near contract call-function as-transaction "$CONTRACT" create_bounty json-args '{"description":"Summarize NEAR Intents 30-day volume","deadline_seconds":3600}' prepaid-gas '100 Tgas' attached-deposit '5 NEAR' sign-as "$CREATOR" network-config testnet sign-with-keychain send
 if [[ "$BOUNTY_ID" == "0" ]]; then BOUNTY_ID=$(near contract call-function as-read-only "$CONTRACT" get_next_bounty_id json-args '{}' network-config testnet | rg -o '[0-9]+' | tail -1); BOUNTY_ID=$((BOUNTY_ID-1)); fi
 echo "[2/6] Agent 1 joins"
