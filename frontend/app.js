@@ -74,7 +74,14 @@ async function sendFunctionCall(methodName, args, deposit, gas) {
 }
 
 async function createLive() {
-  try { await sendFunctionCall('create_bounty', { description: 'Summarize NEAR Intents 30-day volume with a clear, evidence-backed readout.', deadline_seconds: 3600 }, parseNearAmount('5'), '100000000000000'); toast('Bounty created on testnet'); await refreshLive(); } catch (error) { toast(`Create failed: ${error.message}`); }
+  try {
+    const nextBountyId = Number(await liveView('get_next_bounty_id', {}));
+    await sendFunctionCall('create_bounty', { description: 'Summarize NEAR Intents 30-day volume with a clear, evidence-backed readout.', deadline_seconds: 3600 }, parseNearAmount('5'), '100000000000000');
+    state.selected = nextBountyId;
+    toast(`Bounty #${String(nextBountyId).padStart(3, '0')} created on testnet`);
+    await refreshLive();
+    window.requestAnimationFrame(() => el('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  } catch (error) { toast(`Create failed: ${error.message}`); }
 }
 
 async function settleLive() {
