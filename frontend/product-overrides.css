@@ -40,3 +40,32 @@
   align-items: center;
   gap: 18px;
 }
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  color: var(--orange);
+  line-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.brand-mark svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  overflow: visible;
+}
+
+.brand-mark path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.brand-mark circle {
+  fill: var(--paper);
+  stroke: currentColor;
+  stroke-width: 2;
+}
