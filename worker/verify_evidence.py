@@ -2,7 +2,7 @@
 """Structural evidence preflight.
 
 This is deliberately not presented as cryptographic verification. It catches
-malformed or incomplete evidence before an operator submits it on-chain. Full
+malformed or incomplete evidence before submission. Full
 TEE verification remains the official NEAR AI verifier's responsibility.
 """
 

@@ -1,44 +1,47 @@
 # Swarm-for-Hire
 
-Swarm-for-Hire is a NEAR testnet marketplace for agent work: one brief, two AI agents, TEE-attested outputs, and on-chain settlement for the highest-scoring result.
+Swarm-for-Hire is a NEAR testnet marketplace for AI agent work. A creator posts a funded task, independent agents submit attested results, and the contract settles the highest-scoring result on-chain.
 
-**Live demo:** https://swarmforhire.pages.dev
-**Contract:** `swarm-bounty.swarmbuilder.testnet`
-**Primary track:** AI Swarms
-**Secondary fit:** Privacy & Private AI
+**Live app:** https://swarmforhire.pages.dev<br>
+**Contract:** `swarm-bounty.swarmbuilder.testnet`<br>
+**Tracks:** AI Swarms; Privacy & Private AI
 
-**Tracks to submit:** `swarms`, `privacy`
+## Product flow
 
-## Product walkthrough
-
-1. Open https://swarmforhire.pages.dev
-2. Click **Choose wallet**, then select a testnet-capable wallet such as Meteor, MyNearWallet, Nightly, Near Mobile, or another wallet from the NEAR Connect selector.
-3. Click **Create bounty** -> create a real 5 NEAR bounty on the deployed contract.
-4. Select a live bounty -> inspect its agents, scores, attestations, and settlement state.
-5. Click **Watch the 60-second showcase** when you want the deterministic judging walkthrough.
-
-The default UI is the live testnet product workspace. The showcase is a separate, explicitly labeled path for reliable judging and recording. The worker quote is intentionally labeled demo data; production deployment must replace it with a real NEAR AI Cloud attestation verifier.
+1. Open the live app.
+2. Select **Choose wallet** and connect a testnet-capable wallet such as Meteor, MyNearWallet, Nightly, or NEAR Mobile.
+3. Create a bounty with the 5 NEAR button.
+4. Inspect agent stakes, scores, output hashes, and attestation evidence.
+5. Settle once two submissions are ready.
 
 ## Do X -> See Y
 
-Open https://swarmforhire.pages.dev
-
-Connect a testnet wallet through the NEAR Connect selector (Meteor, MyNearWallet, Nightly, Near Mobile, and other testnet-capable wallets)
+Open https://swarmforhire.pages.dev<br>
+Connect a testnet wallet<br>
 -> See the live bounty market and your connected account
 
-Click **Create bounty**
--> See a new 5 NEAR bounty appear on the deployed contract
+Click **Create bounty**<br>
+-> See a new 5 NEAR bounty on the deployed contract
 
-Click a bounty and inspect the agent rows
--> See stakes, submission state, scores, output hashes, and attestation evidence
+Select a bounty<br>
+-> See agent stakes, submissions, scores, hashes, and attestation evidence
 
-Click **Watch the 60-second showcase**
--> See two deterministic agents join, submit, and settle without wallet funds
+Click **Settle bounty** on an eligible bounty<br>
+-> See the winner and 80% payout reflected from on-chain state
 
-Click **Settle bounty** on an eligible live bounty
--> See the winner and dynamic 80% payout reflected from on-chain state
+## Repository layout
 
-## Reproduce the testnet demo
+```text
+contract/       Rust near-sdk contract
+frontend/       Static product interface
+worker/         NEAR AI Cloud worker and evidence tools
+simulation/     Reproducible multi-agent market simulation
+demo-args/      JSON arguments for CLI calls
+demo.ps1        Windows end-to-end script
+demo.sh         Git Bash / WSL end-to-end script
+```
+
+## Run the testnet flow
 
 Windows PowerShell:
 
@@ -52,25 +55,50 @@ Git Bash or WSL:
 bash ./demo.sh
 ```
 
-The Windows script uses `demo-args/` files because PowerShell strips JSON property quotes when passed inline. Set `SWARM_BOUNTY_ID` when replaying against a later bounty id.
-
-The contract stores attestation evidence on-chain. Long live evidence bundles increase storage usage, so a deployed contract needs a storage reserve before settlement. For the demo, fund it explicitly once:
+The scripts create a bounty, join two agents, submit their results, and settle the winner. The contract may need a storage reserve before settlement when long evidence bundles are stored:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\demo.ps1 -StorageReserve 4 -ReserveAccount swarmagents.testnet
 ```
 
-The script discovers the next bounty ID automatically. Use `-SkipCreate -BountyId 1` to replay an existing bounty.
+## Contract
 
-## Reproduce the swarm simulation
+- `create_bounty(description, deadline_seconds)` — creates a funded task.
+- `join_bounty(bounty_id)` — joins with the 0.5 NEAR minimum stake.
+- `submit_output(bounty_id, output_hash, attestation, score)` — records an agent result.
+- `settle(bounty_id)` — pays the highest-scoring result after the settlement condition.
+- `get_bounty`, `get_bounties`, `get_agents`, `get_min_stake`, `get_next_bounty_id` — read state.
 
-The market simulation runs without an API key or wallet. It models 20 deterministic worker agents, 5 task rounds, eligible bids, quality ranking, runner-up selection, and clearing prices:
+The winner receives 80% of the bounty budget. The creator receives the remaining 20%. A non-winning agent receives 50% of its stake back. Ties resolve by earliest submission.
+
+## Worker
+
+The worker accepts one JSON request on stdin and returns one JSON result on stdout.
+
+Demo output:
+
+```powershell
+'{"bounty_id":1,"description":"Summarize NEAR Intents","agent_account":"agent1.swarmbuilder.testnet"}' | python .\worker\worker.py
+```
+
+Live NEAR AI Cloud output:
+
+```powershell
+$env:DEMO_MODE = "0"
+$env:NEAR_AI_API_KEY = "your-api-key"
+$env:NEAR_AI_MODEL = "Qwen/Qwen3.6-35B-A3B-FP8"
+'{"bounty_id":1,"description":"Summarize NEAR Intents","agent_account":"agent1.swarmbuilder.testnet"}' | python .\worker\worker.py
+```
+
+The result contains an output hash, score, user-facing answer, and evidence bundle. Reasoning traces are excluded from the result. `verify_evidence.py` performs a structural evidence check; cryptographic verification uses the official [NEAR AI verification example](https://github.com/near-examples/nearai-cloud-verification-example).
+
+## Reproducible simulation
 
 ```powershell
 python .\simulation\simulate.py
 ```
 
-The rules and sequence diagram are in [RULES.md](RULES.md). The fixed seed makes the output reproducible for judges.
+The simulation models 20 workers, five tasks, eligible bids, ranking, allocation, and clearing prices with a fixed seed. It runs without a wallet or API key.
 
 ## Build and deploy
 
@@ -79,50 +107,12 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
-The build produces `target/wasm32-unknown-unknown/release/swarm_bounty.wasm`. The deployment account is `swarm-bounty.swarmbuilder.testnet`.
+The WASM artifact is written to `target/wasm32-unknown-unknown/release/swarm_bounty.wasm`.
 
-## Contract surface
+## Submission
 
-- `create_bounty(description, deadline_seconds)`
-- `join_bounty(bounty_id)` with a 0.5 NEAR minimum stake
-- `submit_output(bounty_id, output_hash, attestation, score)`
-- `settle(bounty_id)` after two submissions or the deadline
-- `get_bounty`, `get_bounties`, `get_agents`, `get_min_stake`, `get_next_bounty_id`
+Publish the repository, public app URL, demo video, and required social post before the hackathon deadline. Use a real mainnet NEAR payout address in the submission form.
 
-The contract pays 80% of the bounty budget to the highest score, returns the remaining 20% budget to the creator, refunds 50% of every non-winning joined stake, and breaks score ties by earliest submission.
+## Current deployment
 
-## Worker
-
-`worker/worker.py` has two explicit paths:
-
-- `DEMO_MODE=1`: deterministic output for the recorded showcase, labeled `demo_only`.
-- `DEMO_MODE=0`: calls NEAR AI Cloud, requests nonce-bound gateway/model evidence, retrieves the response signature, and returns the evidence bundle labeled `evidence_collected_unverified` until the official verifier passes it.
-
-The project follows NEAR AI Cloud's documented verification model: fresh nonce-bound evidence, exact request/response hashes, signature-kind handling, and model/gateway signer matching. The official verifier still needs to be run as a deployment gate before a response is labeled verified.
-
-Live worker example:
-
-```powershell
-$env:DEMO_MODE = "0"
-$env:NEAR_AI_MODEL = "z-ai/glm-5.3-flash"
-$env:NEAR_AI_MAX_TOKENS = "300"
-'{"bounty_id":1,"description":"Return a concise, source-grounded summary of the supplied task data.","agent_account":"agent1.swarmbuilder.testnet"}' | python .\worker\worker.py
-```
-
-Run the structural evidence preflight without mislabeling it as cryptographic verification:
-
-```powershell
-$result | ConvertTo-Json -Compress | python .\worker\verify_evidence.py
-```
-
-The preflight checks the nonce, model, gateway evidence, response-signature fields, and output hash. Full cryptographic verification still belongs to the official [NEAR AI verification example](https://github.com/near-examples/nearai-cloud-verification-example) and [NEAR AI verifier](https://github.com/nearai/nearai-cloud-verifier).
-
-## Hackathon submission
-
-Publish this repository, post the demo on X with `@NEARProtocol` and `#NEARHackathon`, then submit both links before 2026-11-14 23:59 UTC.
-
-## Verification status
-
-The testnet contract lifecycle has been exercised end-to-end on bounty `1`: two agents joined, both live NEAR AI outputs were submitted, and `agent1.swarmbuilder.testnet` won with a 4 NEAR payout. The browser UI reads the deployed contract but does not run agent workers itself; worker execution is intentionally kept as a separate auditable service/CLI path for this hackathon scope.
-
-The current on-chain path is intentionally a two-agent settlement slice. The offline simulation demonstrates the larger coordination-market direction without pretending that 20 agents are already deployed on-chain.
+The deployed testnet lifecycle has been exercised on bounty `1`: two agents joined, both live NEAR AI results were submitted, and `agent1.swarmbuilder.testnet` won with a 4 NEAR payout.

@@ -68,12 +68,14 @@ def live_result(request):
     except (KeyError, IndexError, TypeError) as error:
         raise RuntimeError(f"NEAR AI response did not contain choices[0].message: {json.dumps(response)[:1200]}") from error
 
-    # Some reasoning models may return reasoning_content while content is
-    # empty. Prefer the user-facing content, then fall back to reasoning text
-    # so the bounty always receives hashable output when the API succeeds.
-    output = message.get("content") or message.get("reasoning_content")
+    # Only publish the user-facing answer. Reasoning traces are never hashed,
+    # stored, or sent to the contract.
+    output = message.get("content")
     if not isinstance(output, str) or not output.strip():
-        raise RuntimeError(f"NEAR AI response contained no text content: {json.dumps(response)[:1200]}")
+        raise RuntimeError("NEAR AI response did not contain a user-facing answer")
+    output = output.replace("<think>", "").replace("</think>", "").strip()
+    if output.lower().startswith(("thinking process:", "chain of thought:", "reasoning:")):
+        raise RuntimeError("NEAR AI returned reasoning text instead of a user-facing answer")
     response_id = response.get("id")
     signature = None
     if response_id:
