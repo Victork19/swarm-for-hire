@@ -9,7 +9,7 @@ const showcase = params.get('mode') === 'showcase';
 // This app is deployed against the testnet contract. Requiring testnet here
 // prevents a mainnet wallet session from being selected accidentally.
 const connector = new NearConnector({ network: 'testnet', features: { signAndSendTransaction: true }, footerBranding: null });
-const state = { bounties: [], selected: null, wallet: null, walletAccount: null };
+const state = { bounties: [], selected: null, wallet: null, walletAccount: null, busy: false };
 const el = (id) => document.getElementById(id);
 const fmt = (value) => Number(value).toFixed(2);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
@@ -17,6 +17,14 @@ const demoAgents = [{ account: AGENT1, stake: 0.5, submitted: true, score: 90, a
 
 function toast(message) { const target = el('toast'); target.textContent = message; target.classList.add('show'); window.setTimeout(() => target.classList.remove('show'), 3000); }
 function emptyState() { return '<div class="empty"><span>-</span><p>No bounty found on testnet.</p><small>Create the first task to open the market.</small></div>'; }
+function evidenceMeta(attestation) {
+  if (!attestation) return { label: 'Awaiting evidence', className: 'pending' };
+  try {
+    const evidence = JSON.parse(attestation);
+    if (evidence.response_signature && evidence.nonce) return { label: 'Live TEE evidence', className: 'live' };
+  } catch (_) { /* Compact demo evidence is not JSON. */ }
+  return { label: 'Evidence recorded', className: 'recorded' };
+}
 
 function renderList() {
   el('bounty-count').textContent = String(state.bounties.length).padStart(2, '0');
@@ -32,10 +40,11 @@ function renderDetail() {
   const submissions = bounty.agents.filter((agent) => agent.submitted).length;
   const canSettle = bounty.status === 'Settled' || submissions >= 2;
   const joined = state.walletAccount && bounty.agents.some((agent) => agent.account === state.walletAccount);
-  const rows = bounty.agents.map((agent) => { const account = agent.account || 'account unavailable'; const attestation = agent.attestation || ''; return `<tr><td><span class="agent-account">${escapeHtml(account)}</span><small>${agent.submitted ? 'TEE worker complete' : 'awaiting worker'}</small></td><td>${fmt(agent.stake)} NEAR</td><td>${agent.submitted ? 'received' : 'pending'}</td><td>${agent.submitted ? `<code class="attestation" title="${escapeHtml(attestation)}">${escapeHtml(attestation)}</code>` : '-'}</td><td><span class="score ${bounty.winner === agent.account ? 'winner' : ''}">${agent.submitted ? escapeHtml(agent.score) : '-'}</span></td></tr>`; }).join('');
+  const rows = bounty.agents.map((agent) => { const account = agent.account || 'account unavailable'; const attestation = agent.attestation || ''; const evidence = evidenceMeta(attestation); return `<tr><td><span class="agent-account">${escapeHtml(account)}</span><small>${agent.submitted ? 'result received' : 'awaiting result'}</small></td><td>${fmt(agent.stake)} NEAR</td><td>${agent.submitted ? 'received' : 'pending'}</td><td>${agent.submitted ? `<span class="evidence-cell"><span class="evidence-dot ${evidence.className}"></span><code class="attestation" title="${escapeHtml(attestation)}">${escapeHtml(evidence.label)}</code></span>` : '-'}</td><td><span class="score ${bounty.winner === agent.account ? 'winner' : ''}">${agent.submitted ? escapeHtml(agent.score) : '-'}</span></td></tr>`; }).join('');
   const winner = bounty.winner || '';
   const payout = fmt(Number(bounty.budget) * 0.8);
-  el('detail').innerHTML = `<div class="detail-header"><div><div class="detail-kicker">BOUNTY / ${String(bounty.id).padStart(3, '0')} - ${showcase ? 'SHOWCASE' : 'LIVE TESTNET'}</div><h2>Agent performance</h2></div><span class="status-tag ${escapeHtml(bounty.status).toLowerCase()}">${escapeHtml(bounty.status)}</span></div><p class="brief">${escapeHtml(bounty.description)}</p><div class="table-wrap"><table class="agent-table"><thead><tr><th>AGENT</th><th>STAKE</th><th>SUBMISSION</th><th>QUOTE</th><th>SCORE</th></tr></thead><tbody>${rows}</tbody></table></div><div class="settle-row"><p>${bounty.status === 'Settled' ? `Settled - winner ${escapeHtml(winner)}` : canSettle ? 'Two submissions are ready for settlement' : 'Waiting for two submissions'}</p><div class="detail-actions">${!showcase && !joined && bounty.status === 'Open' ? '<button type="button" class="text-btn" id="join-btn">Join bounty / 0.5 NEAR</button>' : ''}<button type="button" class="primary" id="settle-btn" ${showcase || !canSettle || bounty.status === 'Settled' ? 'disabled' : ''}>Settle bounty <span>-&gt;</span></button></div></div>${bounty.status === 'Settled' ? `<div class="result"><span>WINNER / ${escapeHtml(winner)}</span><strong>+${payout} NEAR</strong></div>` : ''}`;
+  const progress = `${bounty.agents.length}/2 agents · ${submissions}/2 results`;
+  el('detail').innerHTML = `<div class="detail-header"><div><div class="detail-kicker">BOUNTY / ${String(bounty.id).padStart(3, '0')} · ${showcase ? 'SHOWCASE' : 'LIVE TESTNET'}</div><h2>${bounty.status === 'Settled' ? 'Settlement complete' : 'Agent performance'}</h2></div><span class="status-tag ${escapeHtml(bounty.status).toLowerCase()}">${escapeHtml(bounty.status)}</span></div><p class="brief">${escapeHtml(bounty.description)}</p><div class="bounty-stats"><div><span>BUDGET</span><strong>${fmt(bounty.budget)} <small>NEAR</small></strong></div><div><span>PROGRESS</span><strong>${escapeHtml(progress)}</strong></div><div><span>WINNER PAYOUT</span><strong>${payout} <small>NEAR</small></strong></div></div><div class="table-wrap"><table class="agent-table"><thead><tr><th>AGENT</th><th>STAKE</th><th>SUBMISSION</th><th>EVIDENCE</th><th>SCORE</th></tr></thead><tbody>${rows}</tbody></table></div><div class="settle-row"><p>${bounty.status === 'Settled' ? `Winner · ${escapeHtml(winner)}` : canSettle ? 'Ready for deterministic settlement' : 'Waiting for two agent results'}</p><div class="detail-actions">${!showcase && !joined && bounty.status === 'Open' ? '<button type="button" class="text-btn" id="join-btn">Join bounty / 0.5 NEAR</button>' : ''}<button type="button" class="primary" id="settle-btn" ${showcase || !canSettle || bounty.status === 'Settled' ? 'disabled' : ''}>Settle bounty <span>-&gt;</span></button></div></div>${bounty.status === 'Settled' ? `<div class="result"><div><span>WINNER</span><b>${escapeHtml(winner)}</b></div><strong>+${payout} NEAR</strong></div>` : ''}`;
   const button = el('settle-btn');
   if (button) button.addEventListener('click', settleLive);
   const joinButton = el('join-btn');
@@ -74,6 +83,10 @@ async function sendFunctionCall(methodName, args, deposit, gas) {
 }
 
 async function createLive() {
+  if (state.busy) return;
+  state.busy = true;
+  el('create-btn').disabled = true;
+  el('create-btn').innerHTML = 'Creating bounty <span>...</span>';
   try {
     const nextBountyId = Number(await liveView('get_next_bounty_id', {}));
     await sendFunctionCall('create_bounty', { description: 'Summarize NEAR Intents 30-day volume with a clear, evidence-backed readout.', deadline_seconds: 3600 }, parseNearAmount('5'), '100000000000000');
@@ -81,7 +94,7 @@ async function createLive() {
     toast(`Bounty #${String(nextBountyId).padStart(3, '0')} created on testnet`);
     await refreshLive();
     window.requestAnimationFrame(() => el('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  } catch (error) { toast(`Create failed: ${error.message}`); }
+  } catch (error) { toast(`Create failed: ${error.message}`); } finally { state.busy = false; el('create-btn').disabled = false; el('create-btn').innerHTML = 'Create bounty <span>5 NEAR</span>'; }
 }
 
 async function settleLive() {
@@ -110,6 +123,7 @@ connector.on('wallet:signOut', () => {
   renderDetail();
 });
 el('wallet-btn').addEventListener('click', () => connectWallet().catch((error) => toast(`Wallet connection failed: ${error.message}`)));
+el('refresh-btn').addEventListener('click', () => refreshLive().then(() => toast('Market refreshed')).catch(() => {}));
 if (!showcase) el('create-btn').addEventListener('click', createLive);
 el('showcase-btn').addEventListener('click', () => { if (showcase) { location.href = location.pathname; return; } location.href = `${location.pathname}?mode=showcase`; });
 if (showcase) { el('mode-label').textContent = 'SHOWCASE MODE'; el('showcase-btn').textContent = 'Back to live market'; el('create-btn').textContent = 'Run showcase'; el('create-btn').addEventListener('click', runShowcase); el('product-status').textContent = 'Deterministic walkthrough. No wallet or funds required.'; runShowcase(); } else { renderList(); refreshLive(); }
