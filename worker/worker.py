@@ -62,8 +62,21 @@ def live_result(request):
         raise RuntimeError(f"NEAR AI response did not contain choices[0].message: {json.dumps(response)[:1200]}") from error
 
     # Only publish the user-facing answer. Reasoning traces are never hashed,
-    # stored, or sent to the contract.
+    # stored, or sent to the contract. Some reasoning models place the final
+    # answer in reasoning_content, so extract only its final answer section.
     output = message.get("content")
+    if not isinstance(output, str) or not output.strip():
+        reasoning = message.get("reasoning_content")
+        if isinstance(reasoning, str) and reasoning.strip():
+            markers = ("final answer:", "answer:", "final:")
+            lowered = reasoning.lower()
+            marker_positions = [(lowered.rfind(marker), marker) for marker in markers if lowered.rfind(marker) >= 0]
+            if marker_positions:
+                position, marker = max(marker_positions, key=lambda item: item[0])
+                output = reasoning[position + len(marker):].strip()
+            else:
+                paragraphs = [part.strip() for part in reasoning.split("\n\n") if part.strip()]
+                output = paragraphs[-1] if paragraphs else ""
     if not isinstance(output, str) or not output.strip():
         raise RuntimeError("NEAR AI response did not contain a user-facing answer")
     output = output.replace("<think>", "").replace("</think>", "").strip()

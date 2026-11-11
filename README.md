@@ -97,6 +97,8 @@ To run the live worker flow against an existing open bounty:
 ```powershell
 $env:NEAR_AI_API_KEY = "your-api-key"
 powershell -ExecutionPolicy Bypass -File .\live-demo.ps1 -BountyId 3
+
+If both agents have already joined, add `-SkipJoins` to resume from live worker execution.
 ```
 
 ## Reproducible simulation

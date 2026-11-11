@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory = $true)]
-  [int]$BountyId
+  [int]$BountyId,
+  [switch]$SkipJoins
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,12 +42,16 @@ function Invoke-Worker([string]$Agent, [int]$Score) {
   return $result
 }
 
-Write-Host "[1/6] Agent 1 joins bounty $BountyId"
-Write-JsonFile (Join-Path $runDir 'join.json') @{ bounty_id = $BountyId }
-Invoke-NearChecked @('contract','call-function','as-transaction',$contract,'join_bounty','file-args',"$runDir\join.json",'prepaid-gas','50 Tgas','attached-deposit','0.5 NEAR','sign-as',$agent1,'network-config','testnet','sign-with-keychain','send')
+if ($SkipJoins) {
+  Write-Host "[1/6] Reusing joined agents for bounty $BountyId"
+} else {
+  Write-Host "[1/6] Agent 1 joins bounty $BountyId"
+  Write-JsonFile (Join-Path $runDir 'join.json') @{ bounty_id = $BountyId }
+  Invoke-NearChecked @('contract','call-function','as-transaction',$contract,'join_bounty','file-args',"$runDir\join.json",'prepaid-gas','50 Tgas','attached-deposit','0.5 NEAR','sign-as',$agent1,'network-config','testnet','sign-with-keychain','send')
 
-Write-Host "[2/6] Agent 2 joins bounty $BountyId"
-Invoke-NearChecked @('contract','call-function','as-transaction',$contract,'join_bounty','file-args',"$runDir\join.json",'prepaid-gas','50 Tgas','attached-deposit','0.5 NEAR','sign-as',$agent2,'network-config','testnet','sign-with-keychain','send')
+  Write-Host "[2/6] Agent 2 joins bounty $BountyId"
+  Invoke-NearChecked @('contract','call-function','as-transaction',$contract,'join_bounty','file-args',"$runDir\join.json",'prepaid-gas','50 Tgas','attached-deposit','0.5 NEAR','sign-as',$agent2,'network-config','testnet','sign-with-keychain','send')
+}
 
 Write-Host '[3/6] Agent 1 requests a live NEAR AI Cloud result'
 $result1 = Invoke-Worker $agent1 90
