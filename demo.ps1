@@ -1,4 +1,9 @@
-param([int]$BountyId = 0, [switch]$SkipCreate)
+param(
+  [int]$BountyId = -1,
+  [switch]$SkipCreate,
+  [decimal]$StorageReserve = 0,
+  [string]$ReserveAccount = ''
+)
 $ErrorActionPreference = 'Stop'
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
 $contract = 'swarm-bounty.swarmbuilder.testnet'
@@ -6,6 +11,23 @@ $creator = 'creator.swarmbuilder.testnet'
 $agent1 = 'agent1.swarmbuilder.testnet'
 $agent2 = 'agent2.swarmbuilder.testnet'
 $argsDir = Join-Path $PSScriptRoot 'demo-args'
+
+function Invoke-NearCapture([string[]]$Arguments) {
+  $output = (& near @Arguments 2>&1 | Out-String)
+  if ($LASTEXITCODE -ne 0) { throw "NEAR command failed: near $($Arguments -join ' ')`n$output" }
+  return $output
+}
+
+if ($BountyId -lt 0 -and $env:SWARM_BOUNTY_ID) { $BountyId = [int]$env:SWARM_BOUNTY_ID }
+if ($SkipCreate -and $BountyId -lt 0) { throw 'Set -BountyId when using -SkipCreate.' }
+
+if (-not $SkipCreate -and $BountyId -lt 0) {
+  $nextOutput = Invoke-NearCapture @('contract','call-function','as-read-only',$contract,'get_next_bounty_id','json-args','{}','network-config','testnet','now')
+  $match = [regex]::Match($nextOutput, 'Function execution return value \(printed to stdout\):\s*(\d+)')
+  if (-not $match.Success) { throw "Could not determine the next bounty id from near output.`n$nextOutput" }
+  $BountyId = [int]$match.Groups[1].Value
+}
+
 $runArgs = Join-Path $env:TEMP "swarm-demo-$BountyId"
 New-Item -ItemType Directory -Force -Path $runArgs | Out-Null
 Get-ChildItem $argsDir -Filter '*.json' | ForEach-Object {
@@ -19,8 +41,14 @@ function Invoke-NearChecked([string[]]$Arguments) {
   if ($LASTEXITCODE -ne 0) { throw "NEAR command failed: near $($Arguments -join ' ')" }
 }
 
+if ($StorageReserve -gt 0) {
+  if ([string]::IsNullOrWhiteSpace($ReserveAccount)) { throw '-ReserveAccount is required when -StorageReserve is greater than zero.' }
+  Write-Host "[0/6] Funding contract storage reserve: $StorageReserve NEAR from $ReserveAccount"
+  Invoke-NearChecked @('tokens',$ReserveAccount,'send-near',$contract,"$StorageReserve NEAR",'network-config','testnet','sign-with-keychain','send')
+}
+
 if (-not $SkipCreate) {
-  Write-Host "[1/6] Creator creates 5 NEAR bounty (expected id $BountyId)"
+  Write-Host "[1/6] Creator creates 5 NEAR bounty (id $BountyId)"
   Invoke-NearChecked @('contract','call-function','as-transaction',$contract,'create_bounty','file-args',"$runArgs\create.json",'prepaid-gas','100 Tgas','attached-deposit','5 NEAR','sign-as',$creator,'network-config','testnet','sign-with-keychain','send')
 } else { Write-Host "[1/6] Reusing bounty $BountyId" }
 Write-Host '[2/6] Agent 1 joins'

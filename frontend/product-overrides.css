@@ -40,16 +40,3 @@
   align-items: center;
   gap: 18px;
 }
-
-.primary:focus-visible,
-.text-btn:focus-visible,
-.wallet-btn:focus-visible,
-.bounty-item:focus-visible,
-.quote-link:focus-visible {
-  outline: 3px solid var(--orange);
-  outline-offset: 3px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
-}

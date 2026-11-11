@@ -41,3 +41,5 @@ Thumbs.db
 demo-output/
 screenshots/
 recordings/
+worker/*-attestation.json
+worker/*-evidence.json
