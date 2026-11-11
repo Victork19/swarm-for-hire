@@ -11,6 +11,7 @@ $creator = 'creator.swarmbuilder.testnet'
 $agent1 = 'agent1.swarmbuilder.testnet'
 $agent2 = 'agent2.swarmbuilder.testnet'
 $argsDir = Join-Path $PSScriptRoot 'demo-args'
+$utf8NoBom = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false
 
 function Invoke-NearCapture([string[]]$Arguments) {
   $output = (& near @Arguments 2>&1 | Out-String)
@@ -33,7 +34,8 @@ New-Item -ItemType Directory -Force -Path $runArgs | Out-Null
 Get-ChildItem $argsDir -Filter '*.json' | ForEach-Object {
   $payload = Get-Content -Raw $_.FullName | ConvertFrom-Json
   if ($payload.PSObject.Properties.Name -contains 'bounty_id') { $payload.bounty_id = $BountyId }
-  $payload | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $runArgs $_.Name) -Encoding utf8
+  $json = $payload | ConvertTo-Json -Compress
+  [System.IO.File]::WriteAllText((Join-Path $runArgs $_.Name), $json, $utf8NoBom)
 }
 
 function Invoke-NearChecked([string[]]$Arguments) {
