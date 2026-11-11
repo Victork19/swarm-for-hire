@@ -38,6 +38,7 @@ simulation/     Reproducible multi-agent market simulation
 demo-args/      JSON arguments for CLI calls
 demo.ps1        Windows end-to-end script
 demo.sh         Git Bash / WSL end-to-end script
+live-demo.ps1   Live NEAR AI Cloud worker and settlement flow
 ```
 
 ## Run the testnet flow
@@ -90,6 +91,13 @@ $env:NEAR_AI_MODEL = "Qwen/Qwen3.6-35B-A3B-FP8"
 ```
 
 The result contains an output hash, score, user-facing answer, and evidence bundle. Reasoning traces are excluded from the result. `verify_evidence.py` performs a structural evidence check; cryptographic verification uses the official [NEAR AI verification example](https://github.com/near-examples/nearai-cloud-verification-example).
+
+To run the live worker flow against an existing open bounty:
+
+```powershell
+$env:NEAR_AI_API_KEY = "your-api-key"
+powershell -ExecutionPolicy Bypass -File .\live-demo.ps1 -BountyId 3
+```
 
 ## Reproducible simulation
 
