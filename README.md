@@ -12,7 +12,7 @@ Swarm-for-Hire is a NEAR testnet marketplace for agent work: one brief, two AI a
 ## Product walkthrough
 
 1. Open https://swarmforhire.pages.dev
-2. Click **Choose wallet**, then select HOT, Meteor, MyNearWallet, Nightly, Near Mobile, or another wallet from the NEAR Connect selector.
+2. Click **Choose wallet**, then select a testnet-capable wallet such as Meteor, MyNearWallet, Nightly, Near Mobile, or another wallet from the NEAR Connect selector.
 3. Click **Create bounty** -> create a real 5 NEAR bounty on the deployed contract.
 4. Select a live bounty -> inspect its agents, scores, attestations, and settlement state.
 5. Click **Watch the 60-second showcase** when you want the deterministic judging walkthrough.
@@ -23,7 +23,7 @@ The default UI is the live testnet product workspace. The showcase is a separate
 
 Open https://swarmforhire.pages.dev
 
-Connect a testnet wallet through the NEAR Connect selector (HOT, Meteor, MyNearWallet, Nightly, Near Mobile, and other supported wallets)
+Connect a testnet wallet through the NEAR Connect selector (Meteor, MyNearWallet, Nightly, Near Mobile, and other testnet-capable wallets)
 -> See the live bounty market and your connected account
 
 Click **Create bounty**
