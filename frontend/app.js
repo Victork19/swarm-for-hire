@@ -8,7 +8,7 @@ const params = new URLSearchParams(location.search);
 const showcase = params.get('mode') === 'showcase';
 // This app is deployed against the testnet contract. Requiring testnet here
 // prevents a mainnet wallet session from being selected accidentally.
-const connector = new NearConnector({ features: { signAndSendTransaction: true, testnet: true }, footerBranding: null });
+const connector = new NearConnector({ network: 'testnet', features: { signAndSendTransaction: true }, footerBranding: null });
 const state = { bounties: [], selected: null, wallet: null, walletAccount: null };
 const el = (id) => document.getElementById(id);
 const fmt = (value) => Number(value).toFixed(2);
