@@ -16,7 +16,11 @@ import urllib.request
 import urllib.error
 
 
-MODEL = os.environ.get("NEAR_AI_MODEL", "zai-org/GLM-5.1-FP8")
+# This model was selected from the NEAR AI Cloud catalog because it reported
+# is_ready=true during the hackathon build. Override with an exact catalog ID
+# through NEAR_AI_MODEL when needed.
+MODEL = os.environ.get("NEAR_AI_MODEL", "Qwen/Qwen3.6-35B-A3B-FP8")
+MAX_TOKENS = int(os.environ.get("NEAR_AI_MAX_TOKENS", "500"))
 GATEWAY = "https://cloud-api.near.ai"
 
 
@@ -51,9 +55,25 @@ def live_result(request):
     # model call and preserves the preflight's intended security boundary.
     evidence, _ = request_json(f"{GATEWAY}/v1/attestation/report?{query}", headers={"Accept": "application/json", "x-no-aliasing": "true"})
     prompt = request.get("description", "Complete the assigned bounty.")
-    request_body = json.dumps({"model": MODEL, "messages": [{"role": "user", "content": prompt}], "stream": False}, separators=(",", ":")).encode()
+    system_prompt = (
+        "You are a bounty worker. Write only the answer that should be delivered to the user. "
+        "Use 2 to 4 concise sentences, with no numbered steps or preamble. "
+        "Be factual and clearly label uncertainty. If the prompt lacks source data, say that exact "
+        "metrics cannot be verified instead of inventing them."
+    )
+    request_body = json.dumps({"model": MODEL, "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}], "max_tokens": MAX_TOKENS, "stream": False}, separators=(",", ":")).encode()
     response, response_headers = request_json(f"{GATEWAY}/v1/chat/completions", method="POST", headers={"Accept": "application/json", "Content-Type": "application/json", "Authorization": f"Bearer {api_key}", "x-no-aliasing": "true", "Accept-Encoding": "identity"}, body=request_body)
-    output = response["choices"][0]["message"]["content"]
+    try:
+        message = response["choices"][0]["message"]
+    except (KeyError, IndexError, TypeError) as error:
+        raise RuntimeError(f"NEAR AI response did not contain choices[0].message: {json.dumps(response)[:1200]}") from error
+
+    # Some reasoning models may return reasoning_content while content is
+    # empty. Prefer the user-facing content, then fall back to reasoning text
+    # so the bounty always receives hashable output when the API succeeds.
+    output = message.get("content") or message.get("reasoning_content")
+    if not isinstance(output, str) or not output.strip():
+        raise RuntimeError(f"NEAR AI response contained no text content: {json.dumps(response)[:1200]}")
     response_id = response.get("id")
     signature = None
     if response_id:

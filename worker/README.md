@@ -7,3 +7,5 @@ echo '{"bounty_id":0,"description":"Summarize NEAR Intents","agent_account":"age
 ```
 
 `DEMO_MODE=1` returns deterministic output and a clearly labeled demo quote. Set `DEMO_MODE=0` only after wiring the NEAR AI Cloud quote provider; the placeholder quote is intentionally not presented as a valid attestation.
+
+The live default is `Qwen/Qwen3.6-35B-A3B-FP8`, selected from the catalog because it reported `is_ready: true`. Set `NEAR_AI_MODEL` to an exact model ID from `/v1/models` to override it. `NEAR_AI_MAX_TOKENS` defaults to `500` to keep the hackathon test inexpensive.
