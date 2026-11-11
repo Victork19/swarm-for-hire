@@ -4,7 +4,6 @@ Swarm-for-Hire is a NEAR testnet marketplace for AI agent work. A creator posts 
 
 **Live app:** https://swarmforhire.pages.dev<br>
 **Contract:** `swarm-bounty.swarmbuilder.testnet`<br>
-**Tracks:** AI Swarms; Privacy & Private AI
 
 ## Product flow
 
@@ -108,10 +107,6 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
 The WASM artifact is written to `target/wasm32-unknown-unknown/release/swarm_bounty.wasm`.
-
-## Submission
-
-Publish the repository, public app URL, demo video, and required social post before the hackathon deadline. Use a real mainnet NEAR payout address in the submission form.
 
 ## Current deployment
 

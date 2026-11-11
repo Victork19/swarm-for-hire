@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Swarm worker.
-
-DEMO_MODE=1 is a deterministic judging path. DEMO_MODE=0 calls NEAR AI Cloud
-and returns the raw gateway/model evidence for a separate verification gate.
-The worker never labels an unverified response as verified.
-"""
+"""Swarm worker for deterministic and NEAR AI Cloud-backed agent results."""
 
 import hashlib
 import json
@@ -16,9 +11,7 @@ import urllib.request
 import urllib.error
 
 
-# This model was selected from the NEAR AI Cloud catalog because it reported
-# is_ready=true during the hackathon build. Override with an exact catalog ID
-# through NEAR_AI_MODEL when needed.
+# Override with an exact catalog model ID through NEAR_AI_MODEL when needed.
 MODEL = os.environ.get("NEAR_AI_MODEL", "Qwen/Qwen3.6-35B-A3B-FP8")
 MAX_TOKENS = int(os.environ.get("NEAR_AI_MAX_TOKENS", "500"))
 GATEWAY = "https://cloud-api.near.ai"
