@@ -159,3 +159,34 @@
   stroke: currentColor;
   stroke-width: 2;
 }
+
+/* Product-console hierarchy: the queue is the first destination, not a
+   marketing section below a hero. */
+.app-header { padding: 30px clamp(20px, 4vw, 58px) 34px; }
+.app-header .eyebrow { margin-bottom: 24px; }
+.app-header .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); gap: 7vw; align-items: end; }
+.app-header h1 { font-size: clamp(42px, 5.2vw, 76px); line-height: .92; margin-bottom: 18px; }
+.app-header .lede { font-size: 15px; max-width: 520px; margin-bottom: 20px; }
+.header-metrics { border-left: 1px solid var(--ink); display: grid; align-self: stretch; align-content: center; }
+.header-metrics > div { padding: 13px 0 13px 20px; border-bottom: 1px solid var(--line); }
+.header-metrics > div:last-child { border-bottom: 0; }
+.header-metrics span { display: block; color: var(--muted); font: 9px var(--mono); letter-spacing: .12em; }
+.header-metrics strong { display: inline-block; margin-top: 7px; font: 600 18px var(--sans); }
+.header-metrics small { color: var(--muted); font: 10px var(--mono); margin-left: 9px; }
+.workspace { margin: 0 clamp(20px, 4vw, 58px); border-left: 1px solid var(--ink); border-right: 1px solid var(--ink); }
+.workspace-intro { padding-left: 28px; padding-right: 28px; }
+.app-notes { padding: 54px clamp(20px, 4vw, 58px) 72px; border-top: 0; }
+.app-notes h2 { font-size: clamp(28px, 3.8vw, 52px); }
+.app-notes .step h3 { display: none; }
+.app-notes .step p { max-width: 220px; }
+
+@media (max-width: 800px) {
+  .app-header .hero-grid { grid-template-columns: 1fr; gap: 25px; }
+  .header-metrics { border-left: 0; border-top: 1px solid var(--ink); grid-template-columns: repeat(3, 1fr); }
+  .header-metrics > div { padding: 14px 10px 14px 0; border-bottom: 0; border-right: 1px solid var(--line); }
+  .header-metrics > div:not(:first-child) { padding-left: 10px; }
+  .header-metrics > div:last-child { border-right: 0; }
+  .header-metrics small { display: block; margin: 5px 0 0; font-size: 8px; }
+  .workspace { margin: 0 20px; border-left: 0; border-right: 0; }
+  .workspace-intro { padding-left: 0; padding-right: 0; }
+}
