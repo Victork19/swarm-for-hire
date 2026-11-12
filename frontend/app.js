@@ -203,13 +203,13 @@ async function loadCoordinatorSimulation() {
     const budget = Number(item.budget) / 1e24;
     const bids = rawBids.filter((bid) => bid.price !== null && Number(bid.price) / 1e24 <= budget).map((bid) => ({ seller: bid.worker, commitment: bytesToHex(bid.commitment), quality: bid.quality || 0, price: Number(bid.price) / 1e24 }));
     bids.sort((a, b) => b.quality - a.quality || a.price - b.price || a.seller.localeCompare(b.seller));
-    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, bids, winner: bids.find((bid) => bid.seller === item.winner) || bids[0] || null, runnerUp: bids[1] || null };
+    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, phase: item.phase, bids, winner: bids.find((bid) => bid.seller === item.winner) || bids[0] || null, runnerUp: bids[1] || null };
   }));
 }
 
 function renderSwarmSimulation() {
   const round = swarmState.rounds[swarmState.round - 1];
-  const phase = swarmState.round === 0 ? 'Waiting to open round' : swarmState.round < 3 ? 'Commitments sealed' : swarmState.round === 3 ? 'Bids revealed' : 'Allocation cleared';
+  const phase = liveSwarm && round?.phase ? round.phase : swarmState.round === 0 ? 'Waiting to open round' : swarmState.round < 3 ? 'Commitments sealed' : swarmState.round === 3 ? 'Bids revealed' : 'Allocation cleared';
   const rows = round ? round.bids.map((bid, index) => `<tr><td><span class="agent-account">${escapeHtml(bid.seller)}</span><small>${index === 0 ? 'allocated' : 'eligible bid'}</small></td><td><code class="hash" title="${escapeHtml(bid.commitment)}">${escapeHtml(shortHash(bid.commitment))}</code></td><td>${bid.quality}</td><td>${bid.price.toFixed(2)} NEAR</td><td><span class="bid-state ${index === 0 ? 'winner' : ''}">${index === 0 ? 'WINNER' : 'REVEALED'}</span></td></tr>`).join('') : '<tr><td colspan="5" class="simulation-empty">Advance the round to reveal worker bids.</td></tr>';
   el('bounty-list').innerHTML = `<div class="simulation-list-head"><span>SWARM MARKET</span><strong>20 BUYERS · 5 WORKERS</strong></div>${swarmState.rounds.map((item, index) => `<button type="button" class="bounty-item ${index + 1 === swarmState.round ? 'active' : ''}" data-round="${index + 1}"><span class="bounty-item-top"><span>${escapeHtml(item.id)}</span><span>${index + 1 <= swarmState.round ? 'CLEARED' : 'QUEUED'}</span></span><span class="bounty-item-description">${escapeHtml(item.task)} / pooled demand</span><span class="bounty-item-foot"><span>${item.bids.length} ELIGIBLE BIDS</span><span>${item.budget.toFixed(2)} NEAR CAP</span></span></button>`).join('')}`;
   document.querySelectorAll('[data-round]').forEach((item) => item.addEventListener('click', () => { swarmState.round = Number(item.dataset.round); renderSwarmSimulation(); }));
@@ -220,13 +220,13 @@ function renderSwarmSimulation() {
 async function runSwarmSimulation() {
   try {
     swarmState.rounds = liveSwarm ? await loadCoordinatorSimulation() : await buildSwarmSimulation();
-    swarmState.round = 0;
-    el('mode-label').textContent = 'SWARM SIMULATION';
+    swarmState.round = liveSwarm ? 1 : 0;
+    el('mode-label').textContent = liveSwarm ? 'LIVE COORDINATOR' : 'SWARM SIMULATION';
     el('showcase-btn').textContent = 'Back to dashboard';
-    el('create-btn').textContent = 'Advance round';
+    el('create-btn').textContent = liveSwarm ? 'Refresh live state' : 'Advance round';
     el('product-status').textContent = liveSwarm ? `Live coordinator state from ${COORDINATOR}.` : 'Deterministic 20-buyer / 5-worker market. No wallet or funds required.';
-    el('refresh-btn').disabled = true;
-    el('refresh-btn').textContent = 'Simulation';
+    el('refresh-btn').disabled = !liveSwarm;
+    el('refresh-btn').textContent = liveSwarm ? 'Refresh chain' : 'Simulation';
     renderSwarmSimulation();
   } catch (error) {
     el('product-status').textContent = 'Simulation could not initialize. Reload to try again.';
@@ -254,4 +254,4 @@ function registerWalletEvents() {
 el('wallet-btn')?.addEventListener('click', () => connectWallet().catch((error) => toast(`Wallet connection failed: ${error.message}`)));
 el('refresh-btn')?.addEventListener('click', () => refreshLive().then(() => toast('Market refreshed')).catch(() => {}));
 el('showcase-btn')?.addEventListener('click', () => { if (simulation) { location.href = 'dashboard.html'; } else { location.href = 'swarm.html'; } });
-if (simulation) { el('create-btn')?.addEventListener('click', () => { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); }); runSwarmSimulation(); } else if (detailRoute) { el('create-btn')?.addEventListener('click', () => { location.href = 'dashboard.html'; }); el('create-btn').innerHTML = 'Back to dashboard <span>-&gt;</span>'; refreshLive(); } else { el('create-btn')?.addEventListener('click', createLive); renderList(); refreshLive(); window.setInterval(() => { if (!state.loading) refreshLive(); }, 15000); }
+if (simulation) { el('create-btn')?.addEventListener('click', () => { if (liveSwarm) { runSwarmSimulation(); } else { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); } }); runSwarmSimulation(); } else if (detailRoute) { el('create-btn')?.addEventListener('click', () => { location.href = 'dashboard.html'; }); el('create-btn').innerHTML = 'Back to dashboard <span>-&gt;</span>'; refreshLive(); } else { el('create-btn')?.addEventListener('click', createLive); renderList(); refreshLive(); window.setInterval(() => { if (!state.loading) refreshLive(); }, 15000); }

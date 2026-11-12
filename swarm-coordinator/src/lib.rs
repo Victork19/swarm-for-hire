@@ -1,4 +1,4 @@
-use near_sdk::{env, near, AccountId, BorshStorageKey, NearSchema, PanicOnDefault};
+use near_sdk::{env, near, AccountId, BorshStorageKey, NearSchema, PanicOnDefault, Promise, NearToken};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
@@ -147,9 +147,14 @@ impl Contract {
         let mut round = self.get_round_or_panic(round_id);
         assert_eq!(round.phase, RoundPhase::Cleared, "Round not cleared");
         assert!(round.winner.is_some(), "No winner");
+        let winner = round.winner.clone().unwrap();
+        let payout = round.clearing_price.unwrap();
         round.phase = RoundPhase::Allocated;
         self.rounds.insert(&round_id, &round);
-        env::log_str(&format!("SwarmAllocation {{id:{}, winner:{}}}", round_id, round.winner.unwrap()));
+        // Native NEAR settlement is intentionally explicit. The coordinator
+        // must be prefunded with at least the clearing price before allocation.
+        let _ = Promise::new(winner.clone()).transfer(NearToken::from_yoctonear(payout));
+        env::log_str(&format!("SwarmAllocation {{id:{}, winner:{}, payout:{}}}", round_id, winner, payout));
     }
 
     pub fn get_round(&self, round_id: u64) -> Option<RoundView> { self.rounds.get(&round_id).map(|round| self.round_view(round)) }

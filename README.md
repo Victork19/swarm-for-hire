@@ -135,6 +135,8 @@ Build both contracts:
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
+Allocation now sends the clearing price as native NEAR to the winning worker. Prefund `swarm-market.swarmbuilder.testnet` with the payout and its storage reserve before calling `allocate`. This is not being presented as NEAR Intents settlement; an Intents route/solver adapter still requires a real protocol integration and separate end-to-end test.
+
 Deploy the coordinator only after creating or selecting its separate testnet account:
 
 ```powershell

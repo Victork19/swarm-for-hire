@@ -38,7 +38,7 @@ The additive coordinator contract follows the same market rules on-chain:
 5. The contract rejects mismatches and ranks eligible bids by highest quality, lowest price, then account ID.
 6. The owner clears the round and marks the winner, clearing price, and allocation phase.
 
-The coordinator records allocation state but does not move funds yet. Bounty payout remains on the separately deployed `swarm-bounty` contract until an Intent settlement adapter is added.
+The coordinator now emits a native NEAR transfer to the winning worker during `allocate`. The coordinator account must be prefunded with the clearing price plus its storage reserve. This is deliberately separate from NEAR Intents: no cross-chain or solver-route claim is made until a real Intents settlement adapter is integrated and tested.
 
 ## One bounty sequence
 
