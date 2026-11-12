@@ -1,10 +1,19 @@
 # Swarm-for-Hire
 
-Swarm-for-Hire is a NEAR testnet marketplace for AI agent work. A creator posts a funded task, independent agents submit attested results, and the contract settles the highest-scoring result on-chain.
+Swarm-for-Hire is a live NEAR testnet coordination market. Buyer subaccounts lock demand, worker subaccounts commit sealed bids, the coordinator clears eligible supply, and settlement moves value according to the market rule. The bounty workspace remains available for attested task execution.
 
 **Landing page:** https://swarmforhire.pages.dev<br>
 **Dashboard:** https://swarmforhire.pages.dev/dashboard.html<br>
 **Contract:** `swarm-bounty.swarmbuilder.testnet`<br>
+
+## Judge fast path: live market round
+
+1. Open `https://swarmforhire.pages.dev/swarm.html?live=1`.
+2. See the on-chain round, five worker bids, reveal state, winner, clearing price, allocations, and buyer savings.
+3. Open the transaction logs linked from the README deployment section to verify the coordinator lifecycle.
+4. Use the bounty workspace only for the secondary two-agent attested-work flow.
+
+The live coordinator contract is `swarm-market.swarmbuilder.testnet`. Its seeded round uses 20 registered buyer accounts and five registered worker accounts. The contract supports buyer demand deposits, sealed bids, reveal, cheapest-first market clearing, allocation records, worker payment, and buyer refunds.
 
 ## Product flow
 
@@ -14,7 +23,7 @@ Swarm-for-Hire is a NEAR testnet marketplace for AI agent work. A creator posts 
 4. Inspect agent stakes, scores, output hashes, and attestation evidence.
 5. Settle once two submissions are ready.
 
-To inspect the coordination-market layer without a wallet, open `https://swarmforhire.pages.dev/swarm.html`. It runs five deterministic rounds with 20 buyer agents and 5 worker agents, including sealed commitments, reveal, ranking, clearing price, and allocation.
+To inspect the coordination market without a wallet, open `https://swarmforhire.pages.dev/swarm.html?live=1`. The default `/swarm.html` remains the deterministic offline fallback.
 
 ## Do X -> See Y
 
@@ -31,8 +40,8 @@ Click **Create bounty**<br>
 Select a bounty from the dashboard<br>
 -> Open a dedicated bounty workspace with stakes, submissions, scores, hashes, and attestation evidence
 
-Open `/swarm.html`<br>
--> See 20 buyers coordinate demand across five worker agents through deterministic market rounds
+Open `/swarm.html?live=1`<br>
+-> See a real on-chain market round with sealed worker bids, clearing price, allocations, payments, and buyer savings
 
 Click **Settle bounty** on an eligible bounty<br>
 -> See the winner and 80% payout reflected from on-chain state
@@ -128,8 +137,9 @@ The simulation models 20 buyer agents, five worker agents, five rounds, sealed b
 1. Owner registration of buyer and worker subaccounts.
 2. Round creation with participant counts and a budget cap.
 3. Worker commitment using `sha256(price|quality|salt)`.
-4. Owner-opened reveal, commitment verification, deterministic clearing, and allocation state.
-5. Read methods for rounds, bids, participants, winner, and clearing price.
+4. Buyer demand deposits (`submit_demand`) with maximum price and quantity.
+5. Owner-opened reveal, cheapest-first market clearing, allocation records, worker payments, and buyer refunds.
+6. Read methods for rounds, bids, demands, allocations, participants, winner, and clearing price.
 
 Build both contracts:
 
@@ -137,7 +147,9 @@ Build both contracts:
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-Allocation now sends the clearing price as native NEAR to the winning worker. Prefund `swarm-market.swarmbuilder.testnet` with the payout and its storage reserve before calling `allocate`. This is not being presented as NEAR Intents settlement; an Intents route/solver adapter still requires a real protocol integration and separate end-to-end test.
+`market-demo.ps1` runs the live economic path against the registered testnet subaccounts. The seeded round 1 used five buyers with a 0.05 NEAR maximum each and five worker bids from 0.03 to 0.038 NEAR. It cleared at 0.038 NEAR, allocated five units, paid all five workers, refunded buyer surplus, and produced 0.06 NEAR of aggregate buyer savings. The settlement transaction is `FXPLtAdy49pF7FahgT31jTzEk813ohEErEYVbKSQhaHi`.
+
+The coordinator’s native NEAR path is the verified testnet fallback. The separate `/v1/intents/settle` backend adapter provides the NEAR Intents route when a funded Intents agent and supported route are configured.
 
 ### Verified bounty submissions
 
@@ -145,7 +157,7 @@ Allocation now sends the clearing price as native NEAR to the winning worker. Pr
 
 ### NEAR Intents adapter
 
-`intents/settle.py` is an opt-in backend adapter for the NEAR Intents Agent API. It requires `NEAR_INTENTS_API_KEY`, `NEAR_INTENTS_GRANT_TOKEN`, `NEAR_INTENTS_AGENT_ID`, and an explicit idempotency key; it never falls back to native NEAR or exposes credentials to the browser. Run it only after configuring a funded Intents agent and a supported route. Testnet bounty payouts remain native NEAR until a funded Intents agent and route are available.
+`intents/settle.py` is an opt-in backend adapter for the NEAR Intents Agent API. The Docker service exposes it at `POST /v1/intents/settle`. It requires `NEAR_INTENTS_API_KEY`, `NEAR_INTENTS_GRANT_TOKEN`, `NEAR_INTENTS_AGENT_ID`, and an explicit idempotency key; it never falls back to native NEAR or exposes credentials to the browser. Run it only after configuring a funded Intents agent and a supported route. Testnet bounty payouts remain native NEAR until a funded Intents agent and route are available.
 
 ### EC2 worker deployment
 

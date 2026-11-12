@@ -29,8 +29,7 @@ def call(url, payload, headers):
         raise RuntimeError(f"NEAR Intents HTTP {error.code}: {detail}") from error
 
 
-def main():
-    request = json.load(sys.stdin)
+def settle(request):
     required = {
         "NEAR_INTENTS_AGENT_API_URL": os.environ.get("NEAR_INTENTS_AGENT_API_URL"),
         "NEAR_INTENTS_API_KEY": os.environ.get("NEAR_INTENTS_API_KEY"),
@@ -62,7 +61,11 @@ def main():
         "dry": bool(request.get("dry", False)),
     }
     result = call(endpoint, payload, headers)
-    print(json.dumps({"ok": True, "adapter": "near-intents-agent-api", "result": result}))
+    return {"ok": True, "adapter": "near-intents-agent-api", "result": result}
+
+
+def main():
+    print(json.dumps(settle(json.load(sys.stdin))))
 
 
 if __name__ == "__main__":

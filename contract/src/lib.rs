@@ -51,7 +51,7 @@ pub struct BountyView {
 #[serde(crate = "near_sdk::serde")]
 pub struct AgentView {
     pub account: AccountId, pub stake: U128, pub joined_at: u64, pub output_hash: Option<CryptoHash>,
-    pub attestation: Option<String>, pub submitted_at: Option<u64>, pub score: Option<u32>,
+    pub attestation: Option<String>, pub submitted_at: Option<u64>, pub score: Option<u32>, pub verified: bool,
 }
 
 #[near(contract_state)]
@@ -180,7 +180,7 @@ impl Contract {
 
     pub fn get_bounty(&self, bounty_id: u64) -> Option<BountyView> { self.bounties.get(&bounty_id).map(|b| BountyView { id:b.id, creator:b.creator, budget:U128(b.budget), description:b.description, created_at:b.created_at, deadline:b.deadline, status:b.status, winner:b.winner, agent_count:b.agents.len() as u32 }) }
     pub fn get_bounties(&self) -> Vec<BountyView> { self.bounties.iter().map(|(_, b)| BountyView { id:b.id, creator:b.creator, budget:U128(b.budget), description:b.description, created_at:b.created_at, deadline:b.deadline, status:b.status, winner:b.winner, agent_count:b.agents.len() as u32 }).collect() }
-    pub fn get_agents(&self, bounty_id: u64) -> Vec<AgentView> { self.bounties.get(&bounty_id).map(|b| b.agents.iter().map(|(account,a)| AgentView { account, stake:U128(a.stake), joined_at:a.joined_at, output_hash:a.output_hash, attestation:a.attestation, submitted_at:a.submitted_at, score:a.score }).collect()).unwrap_or_default() }
+    pub fn get_agents(&self, bounty_id: u64) -> Vec<AgentView> { self.bounties.get(&bounty_id).map(|b| b.agents.iter().map(|(account,a)| AgentView { verified: is_verified(bounty_id, &account), account, stake:U128(a.stake), joined_at:a.joined_at, output_hash:a.output_hash, attestation:a.attestation, submitted_at:a.submitted_at, score:a.score }).collect()).unwrap_or_default() }
     pub fn get_min_stake(&self) -> U128 { U128(self.min_stake) }
     pub fn get_next_bounty_id(&self) -> u64 { self.next_bounty_id }
 }

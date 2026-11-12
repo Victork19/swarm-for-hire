@@ -97,6 +97,17 @@
 .bid-state.winner { color: #236d55; }
 .simulation-empty { color: var(--muted); font: 11px var(--mono); padding: 28px 0 !important; }
 .verification-panel { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin: 20px 0 24px; padding: 15px 16px; border: 1px solid var(--line); background: #fffaf5; }
+.intent-panel { display: grid; gap: 5px; margin: -8px 0 24px; padding: 13px 16px; border-left: 2px solid var(--orange); background: #f7f5ef; }
+.intent-panel strong { font: 600 13px var(--sans); }
+.intent-panel small { color: var(--muted); font: 10px/1.5 var(--mono); }
+.market-economics { display: flex; justify-content: space-between; gap: 18px; margin: -8px 0 24px; padding: 15px 16px; border: 1px solid var(--orange); background: #fffaf5; }
+.market-economics > div:first-child { display: grid; gap: 5px; }
+.market-economics strong { font: 600 14px var(--sans); }
+.market-economics small { color: var(--muted); font: 10px/1.5 var(--mono); }
+.savings-chip { display: grid; gap: 5px; align-content: center; min-width: 130px; padding-left: 18px; border-left: 1px solid var(--line); }
+.savings-chip span { color: var(--orange); font: 9px var(--mono); letter-spacing: .1em; }
+.savings-chip b { font: 600 16px var(--mono); }
+@media (max-width: 640px) { .market-economics { align-items: flex-start; flex-direction: column; } .savings-chip { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line); width: 100%; } }
 .verification-panel > div:first-child { display: grid; gap: 5px; }
 .verification-panel strong { font: 600 14px var(--sans); color: var(--ink); }
 .verification-panel small { color: var(--muted); font: 10px/1.5 var(--mono); }

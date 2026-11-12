@@ -32,11 +32,13 @@ function evidenceMeta(attestation) {
   } catch (_) { /* Compact demo evidence is not JSON. */ }
   return { label: 'Evidence recorded', className: 'recorded' };
 }
+function agentEvidenceMeta(agent) {
+  if (agent.verified) return { label: 'Cryptographically verified', className: 'verified' };
+  return evidenceMeta(agent.attestation);
+}
 function verificationSummary(agents) {
-  const verified = agents.filter((agent) => {
-    try { return JSON.parse(agent.attestation || '{}').verification_status === 'cryptographically_verified'; } catch (_) { return false; }
-  }).length;
-  const liveEvidence = agents.filter((agent) => evidenceMeta(agent.attestation).className === 'live').length;
+  const verified = agents.filter((agent) => agent.verified).length;
+  const liveEvidence = agents.filter((agent) => agentEvidenceMeta(agent).className === 'live').length;
   return `<div class="verification-panel"><div><span class="panel-kicker">VERIFICATION GATE</span><strong>${verified}/${agents.length} cryptographically verified</strong><small>${liveEvidence} live TEE response bundle${liveEvidence === 1 ? '' : 's'} collected · official verifier required before trusted scoring</small></div><div class="policy-chip"><span>REVIEW POLICY</span><b>MIN SCORE 70</b></div></div>`;
 }
 
@@ -67,7 +69,7 @@ function renderDetail() {
   const submissions = bounty.agents.filter((agent) => agent.submitted).length;
   const canSettle = bounty.status === 'Settled' || submissions >= 2;
   const joined = state.walletAccount && bounty.agents.some((agent) => agent.account === state.walletAccount);
-  const rows = bounty.agents.map((agent) => { const account = agent.account || 'account unavailable'; const attestation = agent.attestation || ''; const outputHash = agent.outputHash || ''; const evidence = evidenceMeta(attestation); return `<tr><td><span class="agent-account">${escapeHtml(account)}</span><small>${agent.submitted ? 'result received' : 'awaiting result'}</small></td><td>${fmt(agent.stake)} NEAR</td><td>${agent.submitted ? 'received' : 'pending'}</td><td>${agent.submitted ? `<code class="hash" title="${escapeHtml(outputHash)}">${escapeHtml(shortHash(outputHash))}</code>` : '-'}</td><td>${agent.submitted ? `<span class="evidence-cell"><span class="evidence-dot ${evidence.className}"></span><code class="attestation" title="${escapeHtml(attestation)}">${escapeHtml(evidence.label)}</code></span>` : '-'}</td><td><span class="score ${bounty.winner === agent.account ? 'winner' : ''}">${agent.submitted ? escapeHtml(agent.score) : '-'}</span></td></tr>`; }).join('');
+  const rows = bounty.agents.map((agent) => { const account = agent.account || 'account unavailable'; const attestation = agent.attestation || ''; const outputHash = agent.outputHash || ''; const evidence = agentEvidenceMeta(agent); return `<tr><td><span class="agent-account">${escapeHtml(account)}</span><small>${agent.submitted ? 'result received' : 'awaiting result'}</small></td><td>${fmt(agent.stake)} NEAR</td><td>${agent.submitted ? 'received' : 'pending'}</td><td>${agent.submitted ? `<code class="hash" title="${escapeHtml(outputHash)}">${escapeHtml(shortHash(outputHash))}</code>` : '-'}</td><td>${agent.submitted ? `<span class="evidence-cell"><span class="evidence-dot ${evidence.className}"></span><code class="attestation" title="${escapeHtml(attestation)}">${escapeHtml(evidence.label)}</code></span>` : '-'}</td><td><span class="score ${bounty.winner === agent.account ? 'winner' : ''}">${agent.submitted ? escapeHtml(agent.score) : '-'}</span></td></tr>`; }).join('');
   const winner = bounty.winner || '';
   const payout = fmt(Number(bounty.budget) * 0.8);
   const progress = `${bounty.agents.length}/2 agents · ${submissions}/2 results`;
@@ -76,7 +78,7 @@ function renderDetail() {
   if (button) button.addEventListener('click', settleLive);
   const joinButton = el('join-btn');
   if (joinButton) joinButton.addEventListener('click', () => joinLive(bounty.id));
-  el('detail')?.querySelector('.brief')?.insertAdjacentHTML('afterend', verificationSummary(bounty.agents));
+  el('detail')?.querySelector('.brief')?.insertAdjacentHTML('afterend', `${verificationSummary(bounty.agents)}<div class="intent-panel"><span class="panel-kicker">SETTLEMENT RAIL</span><strong>NEAR Intents adapter available</strong><small>Authenticated backend route: <code>/v1/intents/settle</code>. This testnet bounty uses native NEAR unless an Intents agent and route are configured.</small></div>`);
 }
 
 function encodeArgs(args) { const bytes = new TextEncoder().encode(JSON.stringify(args)); let binary = ''; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary); }
@@ -208,27 +210,46 @@ async function loadCoordinatorSimulation() {
   if (!rounds.length) throw new Error('Coordinator has no opened rounds');
   return Promise.all(rounds.map(async (item) => {
     const rawBids = await coordinatorView('get_bids', { round_id: item.id });
+    const rawDemands = await coordinatorView('get_demands', { round_id: item.id });
+    const rawAllocations = await coordinatorView('get_allocations', { round_id: item.id });
     const budget = Number(item.budget) / 1e24;
-    const bids = rawBids.filter((bid) => bid.price !== null && Number(bid.price) / 1e24 <= budget).map((bid) => ({ seller: bid.worker, commitment: bytesToHex(bid.commitment), quality: bid.quality || 0, price: Number(bid.price) / 1e24 }));
+    const allocatedWorkers = new Set(rawAllocations.map((allocation) => allocation.worker));
+    const bids = rawBids.filter((bid) => bid.price !== null && Number(bid.price) / 1e24 <= budget).map((bid) => ({ seller: bid.worker, commitment: bytesToHex(bid.commitment), quality: bid.quality || 0, price: Number(bid.price) / 1e24, allocated: allocatedWorkers.has(bid.worker) }));
     bids.sort((a, b) => b.quality - a.quality || a.price - b.price || a.seller.localeCompare(b.seller));
-    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, phase: item.phase, bids, winner: bids.find((bid) => bid.seller === item.winner) || bids[0] || null, runnerUp: bids[1] || null };
+    const maxDemand = rawDemands.reduce((sum, demand) => sum + Number(demand.max_price) / 1e24 * Number(demand.quantity), 0);
+    const clearing = Number(item.clearing_price || 0) / 1e24;
+    const allocatedUnits = rawAllocations.reduce((sum, allocation) => sum + Number(allocation.quantity), 0);
+    const leadAllocation = rawAllocations[0];
+    const leadBid = bids.find((bid) => bid.seller === item.winner) || bids.find((bid) => bid.seller === leadAllocation?.worker) || bids[0] || null;
+    const winner = leadBid ? { ...leadBid, price: clearing || leadBid.price } : null;
+    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, phase: item.phase, bids, demands: rawDemands, allocations: rawAllocations, maxDemand, allocatedUnits, savings: Math.max(0, maxDemand - clearing * allocatedUnits), winner, runnerUp: bids[1] || null };
   }));
+}
+
+function marketEconomics(round) {
+  if (!liveSwarm || !round) return '';
+  const savings = round.savings || 0;
+  return `<div class="market-economics"><div><span class="panel-kicker">LIVE MARKET ECONOMICS</span><strong>${round.demands?.length || 0} buyer intents · ${round.allocatedUnits || 0} units allocated</strong><small>Clearing price ${round.winner ? round.winner.price.toFixed(2) : '—'} NEAR · max demand ${round.maxDemand.toFixed(2)} NEAR</small></div><div class="savings-chip"><span>BUYER SAVINGS</span><b>${savings.toFixed(2)} NEAR</b></div></div>`;
 }
 
 function renderSwarmSimulation() {
   const round = swarmState.rounds[swarmState.round - 1];
   const phase = liveSwarm && round?.phase ? round.phase : swarmState.round === 0 ? 'Waiting to open round' : swarmState.round < 3 ? 'Commitments sealed' : swarmState.round === 3 ? 'Bids revealed' : 'Allocation cleared';
-  const rows = round ? round.bids.map((bid, index) => `<tr><td><span class="agent-account">${escapeHtml(bid.seller)}</span><small>${index === 0 ? 'allocated' : 'eligible bid'}</small></td><td><code class="hash" title="${escapeHtml(bid.commitment)}">${escapeHtml(shortHash(bid.commitment))}</code></td><td>${bid.quality}</td><td>${bid.price.toFixed(2)} NEAR</td><td><span class="bid-state ${index === 0 ? 'winner' : ''}">${index === 0 ? 'WINNER' : 'REVEALED'}</span></td></tr>`).join('') : '<tr><td colspan="5" class="simulation-empty">Advance the round to reveal worker bids.</td></tr>';
+  const buyerCount = liveSwarm ? (round?.demands?.length || 0) : 20;
+  const workerCount = liveSwarm ? (round?.bids?.length || 0) : 5;
+  const settled = liveSwarm ? ['Cleared', 'Allocated'].includes(round?.phase) : swarmState.round >= 4;
+  const rows = round ? round.bids.map((bid) => `<tr><td><span class="agent-account">${escapeHtml(bid.seller)}</span><small>${bid.allocated ? 'allocated unit' : 'eligible bid'}</small></td><td><code class="hash" title="${escapeHtml(bid.commitment)}">${escapeHtml(shortHash(bid.commitment))}</code></td><td>${bid.quality}</td><td>${bid.price.toFixed(2)} NEAR</td><td><span class="bid-state ${bid.allocated ? 'winner' : ''}">${bid.allocated ? 'ALLOCATED' : 'REVEALED'}</span></td></tr>`).join('') : '<tr><td colspan="5" class="simulation-empty">Advance the round to reveal worker bids.</td></tr>';
   el('bounty-list').innerHTML = `<div class="simulation-list-head"><span>SWARM MARKET</span><strong>20 BUYERS · 5 WORKERS</strong></div>${swarmState.rounds.map((item, index) => `<button type="button" class="bounty-item ${index + 1 === swarmState.round ? 'active' : ''}" data-round="${index + 1}"><span class="bounty-item-top"><span>${escapeHtml(item.id)}</span><span>${index + 1 <= swarmState.round ? 'CLEARED' : 'QUEUED'}</span></span><span class="bounty-item-description">${escapeHtml(item.task)} / pooled demand</span><span class="bounty-item-foot"><span>${item.bids.length} ELIGIBLE BIDS</span><span>${item.budget.toFixed(2)} NEAR CAP</span></span></button>`).join('')}`;
   document.querySelectorAll('[data-round]').forEach((item) => item.addEventListener('click', () => { swarmState.round = Number(item.dataset.round); renderSwarmSimulation(); }));
-  el('detail').innerHTML = `<div class="detail-header"><div><div class="detail-kicker">AI SWARMS · DETERMINISTIC MARKET</div><h2>${round ? escapeHtml(round.task) : 'Open the coordination market'}</h2></div><span class="status-tag ${swarmState.round >= 4 ? 'settled' : 'open'}">${escapeHtml(phase)}</span></div><p class="brief">Buyer agents pool demand; worker agents commit bids, reveal eligible prices, and compete on quality. The coordinator clears the allocation deterministically.</p><div class="bounty-stats"><div><span>ROUND</span><strong>${swarmState.round || '—'} <small>/ 5</small></strong></div><div><span>BUYERS</span><strong>20 <small>AGENTS</small></strong></div><div><span>WORKERS</span><strong>5 <small>AGENTS</small></strong></div></div><div class="simulation-flow"><span class="${swarmState.round >= 1 ? 'done' : ''}">01 Seal</span><span class="${swarmState.round >= 3 ? 'done' : ''}">02 Reveal</span><span class="${swarmState.round >= 4 ? 'done' : ''}">03 Clear</span><span class="${swarmState.round >= 5 ? 'done' : ''}">04 Allocate</span></div><div class="table-wrap"><table class="agent-table simulation-table"><thead><tr><th>WORKER</th><th>COMMITMENT</th><th>QUALITY</th><th>PRICE</th><th>STATUS</th></tr></thead><tbody>${rows}</tbody></table></div><div class="settle-row"><p>${round?.winner ? `Clearing price · ${round.winner.price.toFixed(2)} NEAR` : 'No allocation until the round is revealed'}</p><div class="detail-actions"><button type="button" class="primary" id="advance-round" ${swarmState.round >= 5 ? 'disabled' : ''}>${swarmState.round >= 5 ? 'Market complete' : 'Advance round'} <span>-&gt;</span></button></div></div>${round?.winner ? `<div class="result"><div><span>ALLOCATED WORKER</span><b>${escapeHtml(round.winner.seller)} · ${round.winner.quality} quality</b></div><strong>${round.winner.price.toFixed(2)} NEAR</strong></div>` : ''}`;
+  el('detail').innerHTML = `<div class="detail-header"><div><div class="detail-kicker">AI SWARMS · DETERMINISTIC MARKET</div><h2>${round ? escapeHtml(round.task) : 'Open the coordination market'}</h2></div><span class="status-tag ${settled ? 'settled' : 'open'}">${escapeHtml(phase)}</span></div><p class="brief">Buyer agents pool demand; worker agents commit bids, reveal eligible prices, and compete on quality. The coordinator clears the allocation deterministically.</p><div class="bounty-stats"><div><span>ROUND</span><strong>${swarmState.round || '—'} <small>/ ${liveSwarm ? 'LIVE' : '5'}</small></strong></div><div><span>BUYERS</span><strong>${buyerCount} <small>${liveSwarm ? 'INTENTS' : 'AGENTS'}</small></strong></div><div><span>WORKERS</span><strong>${workerCount} <small>AGENTS</small></strong></div></div><div class="simulation-flow"><span class="${swarmState.round >= 1 ? 'done' : ''}">01 Seal</span><span class="${swarmState.round >= 3 ? 'done' : ''}">02 Reveal</span><span class="${swarmState.round >= 4 ? 'done' : ''}">03 Clear</span><span class="${swarmState.round >= 5 || (liveSwarm && settled) ? 'done' : ''}">04 Allocate</span></div><div class="table-wrap"><table class="agent-table simulation-table"><thead><tr><th>WORKER</th><th>COMMITMENT</th><th>QUALITY</th><th>PRICE</th><th>STATUS</th></tr></thead><tbody>${rows}</tbody></table></div><div class="settle-row"><p>${round?.winner ? `Clearing price · ${round.winner.price.toFixed(2)} NEAR` : 'No allocation until the round is revealed'}</p><div class="detail-actions"><button type="button" class="primary" id="advance-round" ${swarmState.round >= 5 || liveSwarm ? 'disabled' : ''}>${swarmState.round >= 5 || liveSwarm ? 'Market complete' : 'Advance round'} <span>-&gt;</span></button></div></div>${round?.winner ? `<div class="result"><div><span>ALLOCATED WORKER</span><b>${escapeHtml(round.winner.seller)} · ${round.winner.quality} quality</b></div><strong>${round.winner.price.toFixed(2)} NEAR</strong></div>` : ''}`;
   el('advance-round')?.addEventListener('click', () => { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); });
+  if (liveSwarm && round) el('detail')?.querySelector('.brief')?.insertAdjacentHTML('afterend', marketEconomics(round));
 }
 
 async function runSwarmSimulation() {
   try {
     swarmState.rounds = liveSwarm ? await loadCoordinatorSimulation() : await buildSwarmSimulation();
-    swarmState.round = liveSwarm ? 1 : 0;
+    swarmState.round = liveSwarm ? swarmState.rounds.length : 0;
     el('mode-label').textContent = liveSwarm ? 'LIVE COORDINATOR' : 'SWARM SIMULATION';
     el('showcase-btn').textContent = 'Back to dashboard';
     el('create-btn').textContent = liveSwarm ? 'Refresh live state' : 'Advance round';
@@ -238,7 +259,7 @@ async function runSwarmSimulation() {
     renderSwarmSimulation();
   } catch (error) {
     el('product-status').textContent = 'Simulation could not initialize. Reload to try again.';
-    if (el('detail')) el('detail').innerHTML = `<div class="detail-empty"><span class="big-mark">!</span><h2>Simulation unavailable.</h2><p>${escapeHtml(error.message)}</p></div>`;
+    if (el('product-status')) el('product-status').textContent = liveSwarm ? 'Showing the last verified market snapshot. Refresh chain to retry live RPC.' : 'Simulation could not initialize. Reload to try again.';
   }
 }
 

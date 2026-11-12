@@ -6,6 +6,9 @@ use near_sdk::{borsh::{BorshDeserialize, BorshSerialize}, CryptoHash};
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey { Buyers, Workers, Rounds, Bids { id: u64 } }
+const DEMANDS_PREFIX: &[u8] = b"swarm-market/demands/";
+const ALLOCATIONS_PREFIX: &[u8] = b"swarm-market/allocations/";
+const MARKET_SETTLED_PREFIX: &[u8] = b"swarm-market/settled/";
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(crate = "near_sdk::serde")]
@@ -49,6 +52,27 @@ pub struct BidView {
     pub worker: AccountId, pub commitment: CryptoHash, pub price: Option<U128>,
     pub quality: Option<u8>, pub revealed_at: Option<u64>,
 }
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Demand {
+    pub buyer: AccountId,
+    pub max_price: u128,
+    pub quantity: u128,
+    pub locked: u128,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct DemandView { pub buyer: AccountId, pub max_price: U128, pub quantity: U128, pub locked: U128 }
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Allocation { pub worker: AccountId, pub price: u128, pub quantity: u128 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct AllocationView { pub worker: AccountId, pub price: U128, pub quantity: U128 }
 
 #[near(contract_state)]
 #[derive(NearSchema, PanicOnDefault)]
@@ -105,6 +129,27 @@ impl Contract {
         self.rounds.insert(&round_id, &round);
     }
 
+    /// Lock buyer demand without changing the deployed Round Borsh layout.
+    /// One buyer may submit one demand record per round.
+    #[payable]
+    pub fn submit_demand(&mut self, round_id: u64, max_price: U128, quantity: U128) {
+        let round = self.get_round_or_panic(round_id);
+        assert_eq!(round.phase, RoundPhase::Open, "Round not accepting demand");
+        let buyer = env::predecessor_account_id();
+        assert!(self.buyers.contains(&buyer), "Buyer not registered");
+        assert!(quantity.0 > 0 && max_price.0 > 0, "Invalid demand");
+        let mut demands = self.demands(round_id);
+        assert!(demands.iter().all(|d| d.buyer != buyer), "Demand already submitted");
+        let locked = max_price.0.checked_mul(quantity.0).unwrap_or_else(|| env::panic_str("Demand overflow"));
+        assert_eq!(env::attached_deposit().as_yoctonear(), locked, "Demand deposit mismatch");
+        demands.push(Demand { buyer, max_price: max_price.0, quantity: quantity.0, locked });
+        self.write_demands(round_id, &demands);
+    }
+
+    pub fn get_demands(&self, round_id: u64) -> Vec<DemandView> {
+        self.demands(round_id).into_iter().map(|d| DemandView { buyer: d.buyer, max_price: U128(d.max_price), quantity: U128(d.quantity), locked: U128(d.locked) }).collect()
+    }
+
     pub fn open_reveal(&mut self, round_id: u64) {
         self.assert_owner();
         let mut round = self.get_round_or_panic(round_id);
@@ -142,6 +187,61 @@ impl Contract {
         env::log_str(&format!("SwarmRoundCleared {{id:{}, winner:{}, clearing_price:{}}}", round_id, winner.worker, winner.price.unwrap()));
     }
 
+    /// Cheapest-first market clearing for locked buyer demand. Each revealed
+    /// worker bid supplies one unit; selected workers share the clearing price.
+    pub fn clear_market(&mut self, round_id: u64) {
+        self.assert_owner();
+        let mut round = self.get_round_or_panic(round_id);
+        assert_eq!(round.phase, RoundPhase::Revealing, "Round not ready to clear");
+        let demands = self.demands(round_id);
+        assert!(demands.len() >= 1, "No buyer demand");
+        let total_quantity: u128 = demands.iter().map(|d| d.quantity).sum();
+        let max_price = demands.iter().map(|d| d.max_price).max().unwrap();
+        let mut ranked: Vec<Bid> = round.bids.iter().filter_map(|(_, bid)| if bid.price.is_some() && bid.quality.is_some() && bid.price.unwrap() <= round.budget && bid.price.unwrap() <= max_price { Some(bid) } else { None }).collect();
+        ranked.sort_by(|a, b| a.price.unwrap().cmp(&b.price.unwrap()).then_with(|| b.quality.unwrap().cmp(&a.quality.unwrap())).then_with(|| a.worker.cmp(&b.worker)));
+        let selected: Vec<Bid> = ranked.into_iter().take(total_quantity as usize).collect();
+        assert!(!selected.is_empty(), "No eligible bids");
+        let clearing_price = selected.iter().map(|b| b.price.unwrap()).max().unwrap();
+        let allocations: Vec<Allocation> = selected.into_iter().map(|b| Allocation { worker: b.worker, price: clearing_price, quantity: 1 }).collect();
+        round.winner = allocations.first().map(|a| a.worker.clone());
+        round.clearing_price = Some(clearing_price);
+        round.phase = RoundPhase::Cleared;
+        self.write_allocations(round_id, &allocations);
+        self.rounds.insert(&round_id, &round);
+        env::log_str(&format!("SwarmMarketCleared {{id:{}, clearing_price:{}, allocated_units:{}}}", round_id, clearing_price, allocations.len()));
+    }
+
+    pub fn get_allocations(&self, round_id: u64) -> Vec<AllocationView> {
+        self.allocations(round_id).into_iter().map(|a| AllocationView { worker: a.worker, price: U128(a.price), quantity: U128(a.quantity) }).collect()
+    }
+
+    /// Pay selected workers and refund each buyer's unused maximum.
+    pub fn allocate_market(&mut self, round_id: u64) {
+        self.assert_owner();
+        let mut round = self.get_round_or_panic(round_id);
+        assert_eq!(round.phase, RoundPhase::Cleared, "Round not cleared");
+        assert!(env::storage_read(&market_settled_key(round_id)).is_none(), "Market already allocated");
+        let allocations = self.allocations(round_id);
+        assert!(!allocations.is_empty(), "No allocations");
+        let clearing_price = round.clearing_price.unwrap();
+        for allocation in &allocations {
+            let amount = allocation.price * allocation.quantity;
+            let _ = Promise::new(allocation.worker.clone()).transfer(NearToken::from_yoctonear(amount));
+        }
+        let mut remaining_units = allocations.iter().map(|a| a.quantity).sum::<u128>();
+        for demand in self.demands(round_id) {
+            let used_units = demand.quantity.min(remaining_units);
+            remaining_units = remaining_units.saturating_sub(used_units);
+            let used = clearing_price.saturating_mul(used_units);
+            let refund = demand.locked.saturating_sub(used);
+            if refund > 0 { let _ = Promise::new(demand.buyer).transfer(NearToken::from_yoctonear(refund)); }
+        }
+        round.phase = RoundPhase::Allocated;
+        self.rounds.insert(&round_id, &round);
+        env::storage_write(&market_settled_key(round_id), &[1]);
+        env::log_str(&format!("SwarmMarketAllocated {{id:{}, clearing_price:{}, allocations:{}}}", round_id, clearing_price, allocations.len()));
+    }
+
     pub fn allocate(&mut self, round_id: u64) {
         self.assert_owner();
         let mut round = self.get_round_or_panic(round_id);
@@ -164,7 +264,15 @@ impl Contract {
     pub fn hash_bid_preview(&self, price: U128, quality: u8, salt: String) -> CryptoHash { Self::hash_bid(price.0, quality, &salt) }
 
     fn round_view(&self, round: Round) -> RoundView { RoundView { id: round.id, task: round.task, budget: U128(round.budget), buyer_count: round.buyer_count, worker_count: round.worker_count, phase: round.phase, opened_at: round.opened_at, bid_count: round.bids.len() as u32, revealed_count: round.bids.iter().filter(|(_, bid)| bid.price.is_some()).count() as u32, winner: round.winner, clearing_price: round.clearing_price.map(U128) } }
+    fn demands(&self, round_id: u64) -> Vec<Demand> { env::storage_read(&demands_key(round_id)).and_then(|bytes| Vec::<Demand>::try_from_slice(&bytes).ok()).unwrap_or_default() }
+    fn write_demands(&mut self, round_id: u64, demands: &[Demand]) { env::storage_write(&demands_key(round_id), &borsh::to_vec(demands).unwrap()); }
+    fn allocations(&self, round_id: u64) -> Vec<Allocation> { env::storage_read(&allocations_key(round_id)).and_then(|bytes| Vec::<Allocation>::try_from_slice(&bytes).ok()).unwrap_or_default() }
+    fn write_allocations(&mut self, round_id: u64, allocations: &[Allocation]) { env::storage_write(&allocations_key(round_id), &borsh::to_vec(allocations).unwrap()); }
 }
+
+fn demands_key(round_id: u64) -> Vec<u8> { [DEMANDS_PREFIX, round_id.to_string().as_bytes()].concat() }
+fn allocations_key(round_id: u64) -> Vec<u8> { [ALLOCATIONS_PREFIX, round_id.to_string().as_bytes()].concat() }
+fn market_settled_key(round_id: u64) -> Vec<u8> { [MARKET_SETTLED_PREFIX, round_id.to_string().as_bytes()].concat() }
 
 #[cfg(test)]
 mod tests {

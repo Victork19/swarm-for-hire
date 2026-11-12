@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from worker.worker import live_result  # noqa: E402
+from intents.settle import settle as settle_intent  # noqa: E402
 
 
 TOKEN = os.environ.get("SWARM_BACKEND_TOKEN")
@@ -44,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"error": "not_found"})
 
     def do_POST(self):
-        if self.path != "/v1/worker":
+        if self.path not in ("/v1/worker", "/v1/intents/settle"):
             self.send_json(404, {"error": "not_found"})
             return
         if not TOKEN:
@@ -58,7 +59,7 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0 or length > 64 * 1024:
                 raise ValueError("request body must be between 1 and 65536 bytes")
             request = json.loads(self.rfile.read(length).decode())
-            result = live_result(request)
+            result = live_result(request) if self.path == "/v1/worker" else settle_intent(request)
             self.send_json(200, result)
         except Exception as error:
             self.send_json(502, {"error": str(error)})
