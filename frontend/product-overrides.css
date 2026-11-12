@@ -53,6 +53,20 @@
   gap: 16px;
 }
 
+/* The workspace is the product surface; the hero introduces it without
+   overpowering the live market. */
+.hero { padding-top: 42px; padding-bottom: 48px; }
+.hero h1 { font-size: clamp(52px, 6.2vw, 88px); margin-bottom: 24px; }
+.hero .lede { margin-bottom: 24px; }
+.signal-card { max-width: 310px; }
+.signal-visual { height: 190px; }
+.workspace { grid-template-columns: 31% 69%; }
+.workspace-intro { grid-column: 1 / -1; display: flex; align-items: end; justify-content: space-between; gap: 28px; padding: 25px clamp(20px, 4vw, 58px); border-bottom: 1px solid var(--ink); }
+.workspace-intro .eyebrow { margin: 0 0 9px; }
+.workspace-intro h2 { margin: 0; font-size: clamp(24px, 3vw, 42px); letter-spacing: -.055em; }
+.sync-status { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font: 10px var(--mono); white-space: nowrap; }
+.sync-status .status-dot { width: 6px; height: 6px; }
+
 .refresh-btn {
   border: 0;
   padding: 0;
@@ -97,6 +111,8 @@
 .result b { display: block; margin-top: 6px; color: #f2efe8; font: 12px var(--mono); }
 
 @media (max-width: 800px) {
+  .hero { padding-top: 34px; padding-bottom: 38px; }
+  .workspace-intro { align-items: flex-start; flex-direction: column; gap: 12px; }
   .bounty-stats { grid-template-columns: 1fr; }
   .bounty-stats > div, .bounty-stats > div:not(:first-child) { padding: 12px 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .bounty-stats > div:last-child { border-bottom: 0; }
