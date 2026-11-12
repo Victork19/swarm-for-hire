@@ -1,10 +1,12 @@
 const CONTRACT = 'swarm-bounty.swarmbuilder.testnet';
+const COORDINATOR = 'swarm-market.swarmbuilder.testnet';
 const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const AGENT1 = 'agent1.swarmbuilder.testnet';
 const AGENT2 = 'agent2.swarmbuilder.testnet';
 const params = new URLSearchParams(location.search);
 const detailRoute = location.pathname.endsWith('/bounty.html');
 const simulation = location.pathname.endsWith('/swarm.html') || params.get('mode') === 'swarm';
+const liveSwarm = simulation && params.get('live') === '1';
 const requestedBounty = Number(params.get('id'));
 // This app is deployed against the testnet contract. Requiring testnet here
 // prevents a mainnet wallet session from being selected accidentally.
@@ -83,6 +85,21 @@ async function liveView(method, args) {
     } catch (error) { lastError = error; }
   }
   throw new Error(`NEAR testnet unavailable: ${lastError.message}`);
+}
+
+async function coordinatorView(method, args) {
+  const payload = { jsonrpc: '2.0', id: 'swarm-coordinator-ui', method: 'query', params: { request_type: 'call_function', finality: 'final', account_id: COORDINATOR, method_name: method, args_base64: encodeArgs(args) } };
+  let lastError = new Error('Coordinator unavailable');
+  for (const rpc of RPCS) {
+    try {
+      const response = await fetch(rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!response.ok) throw new Error(`RPC ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message || 'Coordinator RPC error');
+      return JSON.parse(new TextDecoder().decode(Uint8Array.from(data.result.result)));
+    } catch (error) { lastError = error; }
+  }
+  throw new Error(`Coordinator unavailable: ${lastError.message}`);
 }
 
 async function refreshLive() {
@@ -178,6 +195,18 @@ async function buildSwarmSimulation() {
   }));
 }
 
+async function loadCoordinatorSimulation() {
+  const rounds = await coordinatorView('get_rounds', {});
+  if (!rounds.length) throw new Error('Coordinator has no opened rounds');
+  return Promise.all(rounds.map(async (item) => {
+    const rawBids = await coordinatorView('get_bids', { round_id: item.id });
+    const budget = Number(item.budget) / 1e24;
+    const bids = rawBids.filter((bid) => bid.price !== null && Number(bid.price) / 1e24 <= budget).map((bid) => ({ seller: bid.worker, commitment: bytesToHex(bid.commitment), quality: bid.quality || 0, price: Number(bid.price) / 1e24 }));
+    bids.sort((a, b) => b.quality - a.quality || a.price - b.price || a.seller.localeCompare(b.seller));
+    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, bids, winner: bids.find((bid) => bid.seller === item.winner) || bids[0] || null, runnerUp: bids[1] || null };
+  }));
+}
+
 function renderSwarmSimulation() {
   const round = swarmState.rounds[swarmState.round - 1];
   const phase = swarmState.round === 0 ? 'Waiting to open round' : swarmState.round < 3 ? 'Commitments sealed' : swarmState.round === 3 ? 'Bids revealed' : 'Allocation cleared';
@@ -190,12 +219,12 @@ function renderSwarmSimulation() {
 
 async function runSwarmSimulation() {
   try {
-    swarmState.rounds = await buildSwarmSimulation();
+    swarmState.rounds = liveSwarm ? await loadCoordinatorSimulation() : await buildSwarmSimulation();
     swarmState.round = 0;
     el('mode-label').textContent = 'SWARM SIMULATION';
     el('showcase-btn').textContent = 'Back to dashboard';
     el('create-btn').textContent = 'Advance round';
-    el('product-status').textContent = 'Deterministic 20-buyer / 5-worker market. No wallet or funds required.';
+    el('product-status').textContent = liveSwarm ? `Live coordinator state from ${COORDINATOR}.` : 'Deterministic 20-buyer / 5-worker market. No wallet or funds required.';
     el('refresh-btn').disabled = true;
     el('refresh-btn').textContent = 'Simulation';
     renderSwarmSimulation();

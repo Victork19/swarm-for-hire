@@ -27,6 +27,19 @@ The deterministic simulation models 20 buyer agents coordinating across 5 worker
 - The winner receives the round allocation and the simulation reports the clearing price, runner-up, and bid commitments.
 - A fixed seed makes every run identical.
 
+## On-chain coordinator round
+
+The additive coordinator contract follows the same market rules on-chain:
+
+1. The owner registers buyer and worker subaccounts.
+2. The owner opens a round with a task, budget cap, and expected participant counts.
+3. Each registered worker commits one hash of `price|quality|salt`.
+4. The owner opens reveal; workers reveal the exact values and salt.
+5. The contract rejects mismatches and ranks eligible bids by highest quality, lowest price, then account ID.
+6. The owner clears the round and marks the winner, clearing price, and allocation phase.
+
+The coordinator records allocation state but does not move funds yet. Bounty payout remains on the separately deployed `swarm-bounty` contract until an Intent settlement adapter is added.
+
 ## One bounty sequence
 
 ```text

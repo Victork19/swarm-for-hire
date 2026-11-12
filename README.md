@@ -44,6 +44,7 @@ contract/       Rust near-sdk contract
 frontend/       Static product interface
 worker/         NEAR AI Cloud worker and evidence tools
 simulation/     Reproducible multi-agent market simulation
+swarm-coordinator/ On-chain sealed-bid coordinator contract
 demo-args/      JSON arguments for CLI calls
 demo.ps1        Windows end-to-end script
 demo.sh         Git Bash / WSL end-to-end script
@@ -117,6 +118,30 @@ python .\simulation\simulate.py
 ```
 
 The simulation models 20 buyer agents, five worker agents, five rounds, sealed bid commitments, reveal, ranking, allocation, and clearing prices with a fixed seed. It runs without a wallet or API key.
+
+## On-chain swarm coordinator
+
+`swarm-coordinator/` is an additive contract for the AI Swarms track. It does not replace the deployed bounty contract. The coordinator supports:
+
+1. Owner registration of buyer and worker subaccounts.
+2. Round creation with participant counts and a budget cap.
+3. Worker commitment using `sha256(price|quality|salt)`.
+4. Owner-opened reveal, commitment verification, deterministic clearing, and allocation state.
+5. Read methods for rounds, bids, participants, winner, and clearing price.
+
+Build both contracts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build.ps1
+```
+
+Deploy the coordinator only after creating or selecting its separate testnet account:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy-coordinator.ps1 -Account swarm-market.swarmbuilder.testnet
+```
+
+The live coordinator frontend is opt-in and reads `swarm-market.swarmbuilder.testnet` at `https://swarmforhire.pages.dev/swarm.html?live=1`. The default `/swarm.html` remains the deterministic no-wallet fallback until the coordinator has been deployed and populated.
 
 ## Build and deploy
 

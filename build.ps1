@@ -24,4 +24,9 @@ try {
   $artifact = Join-Path $root 'target\wasm32-unknown-unknown\release\swarm_bounty.wasm'
   if (-not (Test-Path $artifact)) { throw "Expected artifact not found: $artifact" }
   Write-Host "Contract build passed: $artifact" -ForegroundColor Green
+  cargo build --manifest-path .\swarm-coordinator\Cargo.toml --target wasm32-unknown-unknown --release
+  if ($LASTEXITCODE -ne 0) { throw 'Swarm coordinator WASM build failed.' }
+  $coordinatorArtifact = Join-Path $root 'target\wasm32-unknown-unknown\release\swarm_coordinator.wasm'
+  if (-not (Test-Path $coordinatorArtifact)) { throw "Expected artifact not found: $coordinatorArtifact" }
+  Write-Host "Coordinator build passed: $coordinatorArtifact" -ForegroundColor Green
 } finally { Pop-Location }

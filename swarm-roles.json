@@ -1,0 +1,13 @@
+{
+  "parent_account": "swarmbuilder.testnet",
+  "coordinator_account": "swarm-market.swarmbuilder.testnet",
+  "buyers": [
+    "buyer-01.swarmbuilder.testnet", "buyer-02.swarmbuilder.testnet", "buyer-03.swarmbuilder.testnet", "buyer-04.swarmbuilder.testnet", "buyer-05.swarmbuilder.testnet",
+    "buyer-06.swarmbuilder.testnet", "buyer-07.swarmbuilder.testnet", "buyer-08.swarmbuilder.testnet", "buyer-09.swarmbuilder.testnet", "buyer-10.swarmbuilder.testnet",
+    "buyer-11.swarmbuilder.testnet", "buyer-12.swarmbuilder.testnet", "buyer-13.swarmbuilder.testnet", "buyer-14.swarmbuilder.testnet", "buyer-15.swarmbuilder.testnet",
+    "buyer-16.swarmbuilder.testnet", "buyer-17.swarmbuilder.testnet", "buyer-18.swarmbuilder.testnet", "buyer-19.swarmbuilder.testnet", "buyer-20.swarmbuilder.testnet"
+  ],
+  "workers": [
+    "worker-01.swarmbuilder.testnet", "worker-02.swarmbuilder.testnet", "worker-03.swarmbuilder.testnet", "worker-04.swarmbuilder.testnet", "worker-05.swarmbuilder.testnet"
+  ]
+}
