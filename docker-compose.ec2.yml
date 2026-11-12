@@ -1,0 +1,35 @@
+services:
+  worker-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - swarm-private
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SWARM_DOMAIN: ${SWARM_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - worker-api
+    networks:
+      - swarm-private
+
+networks:
+  swarm-private:
+
+volumes:
+  caddy-data:
+  caddy-config:

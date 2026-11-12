@@ -1,0 +1,3 @@
+{$SWARM_DOMAIN} {
+    reverse_proxy worker-api:8080
+}

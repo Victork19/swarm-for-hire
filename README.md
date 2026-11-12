@@ -75,7 +75,9 @@ powershell -ExecutionPolicy Bypass -File .\demo.ps1 -StorageReserve 4 -ReserveAc
 
 - `create_bounty(description, deadline_seconds)` — creates a funded task.
 - `join_bounty(bounty_id)` — joins with the 0.5 NEAR minimum stake.
-- `submit_output(bounty_id, output_hash, attestation, score)` — records an agent result.
+- `submit_output(bounty_id, output_hash, attestation, score)` — legacy compatibility path.
+- `set_bounty_verifier(bounty_id, public_key)` + `submit_verified_output(...)` — verifies a signed scoring envelope on-chain with NEAR's native Ed25519 host function.
+- `settle_verified(bounty_id)` — settles only submissions accepted through the verified path.
 - `settle(bounty_id)` — pays the highest-scoring result after the settlement condition.
 - `get_bounty`, `get_bounties`, `get_agents`, `get_min_stake`, `get_next_bounty_id` — read state.
 
@@ -136,6 +138,25 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
 Allocation now sends the clearing price as native NEAR to the winning worker. Prefund `swarm-market.swarmbuilder.testnet` with the payout and its storage reserve before calling `allocate`. This is not being presented as NEAR Intents settlement; an Intents route/solver adapter still requires a real protocol integration and separate end-to-end test.
+
+### Verified bounty submissions
+
+`worker/verify_evidence.py` remains a structural preflight. The official NEAR AI verifier must validate the TDX/GPU evidence and response signature first. A verifier service can then set `verification_status` to `cryptographically_verified` and sign the canonical envelope with its Ed25519 key using `worker/sign_verified_submission.py`. Configure that public key per bounty, call `submit_verified_output`, and use `settle_verified`; the contract rejects missing keys, malformed signatures, replayed submissions, and unsigned scores. The legacy method is retained only so existing testnet bounties remain readable.
+
+### NEAR Intents adapter
+
+`intents/settle.py` is an opt-in backend adapter for the NEAR Intents Agent API. It requires `NEAR_INTENTS_API_KEY`, `NEAR_INTENTS_GRANT_TOKEN`, `NEAR_INTENTS_AGENT_ID`, and an explicit idempotency key; it never falls back to native NEAR or exposes credentials to the browser. Run it only after configuring a funded Intents agent and a supported route. Testnet bounty payouts remain native NEAR until a funded Intents agent and route are available.
+
+### EC2 worker deployment
+
+`docker-compose.ec2.yml` runs the private worker API behind Caddy. Point a DuckDNS record at the EC2 public IPv4 address, allow inbound TCP 80 and 443 in the EC2 security group, copy `.env.example` to `.env`, set a long random `SWARM_BACKEND_TOKEN`, and run:
+
+```bash
+docker compose -f docker-compose.ec2.yml up -d --build
+curl https://your-name.duckdns.org/healthz
+```
+
+The worker endpoint is `POST /v1/worker` with `Authorization: Bearer $SWARM_BACKEND_TOKEN`. Keep the endpoint private or behind an additional access layer; do not put the bearer token in the browser.
 
 Deploy the coordinator only after creating or selecting its separate testnet account:
 

@@ -1,0 +1,2 @@
+# Only required by sign_verified_submission.py; the base worker uses stdlib.
+cryptography>=43,<47

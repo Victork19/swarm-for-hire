@@ -32,6 +32,13 @@ function evidenceMeta(attestation) {
   } catch (_) { /* Compact demo evidence is not JSON. */ }
   return { label: 'Evidence recorded', className: 'recorded' };
 }
+function verificationSummary(agents) {
+  const verified = agents.filter((agent) => {
+    try { return JSON.parse(agent.attestation || '{}').verification_status === 'cryptographically_verified'; } catch (_) { return false; }
+  }).length;
+  const liveEvidence = agents.filter((agent) => evidenceMeta(agent.attestation).className === 'live').length;
+  return `<div class="verification-panel"><div><span class="panel-kicker">VERIFICATION GATE</span><strong>${verified}/${agents.length} cryptographically verified</strong><small>${liveEvidence} live TEE response bundle${liveEvidence === 1 ? '' : 's'} collected · official verifier required before trusted scoring</small></div><div class="policy-chip"><span>REVIEW POLICY</span><b>MIN SCORE 70</b></div></div>`;
+}
 
 function renderList() {
   if (!el('bounty-list')) return;
@@ -69,6 +76,7 @@ function renderDetail() {
   if (button) button.addEventListener('click', settleLive);
   const joinButton = el('join-btn');
   if (joinButton) joinButton.addEventListener('click', () => joinLive(bounty.id));
+  el('detail')?.querySelector('.brief')?.insertAdjacentHTML('afterend', verificationSummary(bounty.agents));
 }
 
 function encodeArgs(args) { const bytes = new TextEncoder().encode(JSON.stringify(args)); let binary = ''; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary); }

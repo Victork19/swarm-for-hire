@@ -6,6 +6,9 @@ use near_sdk::{borsh::{BorshDeserialize, BorshSerialize}, CryptoHash};
 
 const YOCTO_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 const MIN_STAKE: u128 = 500_000_000_000_000_000_000_000;
+const VERIFIER_PREFIX: &[u8] = b"swarm-for-hire/verifier/";
+const VERIFIED_PREFIX: &[u8] = b"swarm-for-hire/verified/";
+const MIN_VERIFIED_SCORE: u32 = 70;
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey { Bounties, Agents { id: u64 } }
@@ -107,10 +110,62 @@ impl Contract {
         self.bounties.insert(&bounty_id, &bounty);
     }
 
-    pub fn settle(&mut self, bounty_id: u64) {
+    /// Set the Ed25519 public key used by the external NEAR AI verifier for
+    /// this bounty. The verifier must first validate the TDX/GPU evidence and
+    /// response signature off-chain, then sign the canonical envelope below.
+    /// The key is stored in raw storage so this is additive and does not alter
+    /// the Borsh layout of deployed bounty state.
+    pub fn set_bounty_verifier(&mut self, bounty_id: u64, public_key: [u8; 32]) {
+        let bounty = self.bounties.get(&bounty_id).unwrap_or_else(|| env::panic_str("Bounty not found"));
+        assert_eq!(bounty.creator, env::predecessor_account_id(), "Only bounty creator");
+        assert_eq!(bounty.status, BountyStatus::Open, "Bounty not open");
+        env::storage_write(&verifier_key(bounty_id), &public_key);
+    }
+
+    pub fn get_bounty_verifier(&self, bounty_id: u64) -> Option<Vec<u8>> {
+        env::storage_read(&verifier_key(bounty_id))
+    }
+
+    /// Accept only a score and evidence envelope signed by the configured
+    /// verifier. This is the secure replacement for caller-supplied scoring.
+    /// The legacy submit_output method remains for backwards compatibility.
+    pub fn submit_verified_output(&mut self, bounty_id: u64, output_hash: CryptoHash, attestation: String, score: u32, signature: Vec<u8>) {
         let mut bounty = self.bounties.get(&bounty_id).unwrap_or_else(|| env::panic_str("Bounty not found"));
         assert_eq!(bounty.status, BountyStatus::Open, "Bounty not open");
-        let submissions: Vec<(AccountId, AgentEntry)> = bounty.agents.iter().filter(|(_, a)| a.output_hash.is_some()).collect();
+        assert!(score <= 100, "Invalid score");
+        assert!(score >= MIN_VERIFIED_SCORE, "Score below policy threshold");
+        let account = env::predecessor_account_id();
+        let mut agent = bounty.agents.get(&account).unwrap_or_else(|| env::panic_str("Not joined"));
+        assert!(agent.output_hash.is_none(), "Already submitted");
+        assert!(!attestation.is_empty(), "Missing attestation");
+        let public_key: [u8; 32] = env::storage_read(&verifier_key(bounty_id)).unwrap_or_else(|| env::panic_str("Verifier not configured")).try_into().unwrap();
+        let signature: [u8; 64] = signature.try_into().unwrap_or_else(|_| env::panic_str("Invalid verifier signature length"));
+        let attestation_hash = env::sha256_array(attestation.as_bytes());
+        let message = signed_submission_message(bounty_id, &account, &output_hash, &attestation_hash, score);
+        assert!(env::ed25519_verify(&signature, &message, &public_key), "Invalid verifier signature");
+        agent.output_hash = Some(output_hash);
+        agent.attestation = Some(attestation);
+        agent.submitted_at = Some(env::block_timestamp());
+        agent.score = Some(score);
+        bounty.agents.insert(&account, &agent);
+        env::storage_write(&verified_key(bounty_id, &account), &[1]);
+        let submissions = bounty.agents.iter().filter(|(_, a)| a.output_hash.is_some()).count();
+        assert!(env::block_timestamp() <= bounty.deadline || submissions >= 2, "Deadline passed");
+        self.bounties.insert(&bounty_id, &bounty);
+    }
+
+    pub fn settle_verified(&mut self, bounty_id: u64) {
+        self.settle_internal(bounty_id, true);
+    }
+
+    pub fn settle(&mut self, bounty_id: u64) {
+        self.settle_internal(bounty_id, false);
+    }
+
+    fn settle_internal(&mut self, bounty_id: u64, verified_only: bool) {
+        let mut bounty = self.bounties.get(&bounty_id).unwrap_or_else(|| env::panic_str("Bounty not found"));
+        assert_eq!(bounty.status, BountyStatus::Open, "Bounty not open");
+        let submissions: Vec<(AccountId, AgentEntry)> = bounty.agents.iter().filter(|(account, a)| a.output_hash.is_some() && (!verified_only || is_verified(bounty_id, account))).collect();
         assert!(!submissions.is_empty(), "No submissions");
         assert!(submissions.len() >= 2 || env::block_timestamp() >= bounty.deadline, "Deadline passed");
         let winner = submissions.iter().max_by(|a, b| a.1.score.unwrap_or(0).cmp(&b.1.score.unwrap_or(0)).then_with(|| b.1.submitted_at.unwrap_or(u64::MAX).cmp(&a.1.submitted_at.unwrap_or(u64::MAX)))).unwrap().0.clone();
@@ -129,6 +184,14 @@ impl Contract {
     pub fn get_min_stake(&self) -> U128 { U128(self.min_stake) }
     pub fn get_next_bounty_id(&self) -> u64 { self.next_bounty_id }
 }
+
+fn verifier_key(bounty_id: u64) -> Vec<u8> { [VERIFIER_PREFIX, bounty_id.to_string().as_bytes()].concat() }
+fn verified_key(bounty_id: u64, account: &AccountId) -> Vec<u8> { [VERIFIED_PREFIX, bounty_id.to_string().as_bytes(), b"/", account.as_str().as_bytes()].concat() }
+fn is_verified(bounty_id: u64, account: &AccountId) -> bool { env::storage_read(&verified_key(bounty_id, account)).is_some() }
+fn signed_submission_message(bounty_id: u64, account: &AccountId, output_hash: &CryptoHash, attestation_hash: &CryptoHash, score: u32) -> Vec<u8> {
+    format!("swarm-for-hire/v1|{}|{}|{}|{}|{}", bounty_id, account, to_hex(output_hash), to_hex(attestation_hash), score).into_bytes()
+}
+fn to_hex(bytes: &[u8; 32]) -> String { bytes.iter().map(|byte| format!("{byte:02x}")).collect() }
 
 #[cfg(test)]
 mod tests {
