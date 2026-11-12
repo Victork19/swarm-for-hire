@@ -17,13 +17,14 @@ These rules define the deterministic two-agent bounty and the larger offline sim
 
 ## Simulation market
 
-The deterministic simulation models 20 independent worker agents competing for 5 tasks. It is intentionally LLM-free so anyone can reproduce it offline.
+The deterministic simulation models 20 buyer agents coordinating across 5 worker agents over 5 rounds. It is intentionally LLM-free so anyone can reproduce it offline.
 
-- Each task has a fixed budget and quality target.
-- Each worker submits one deterministic bid per task.
+- Each round has a fixed budget and quality target.
+- Each worker submits one deterministic sealed bid per round; the commitment is a SHA-256 hash of the bid fields.
+- The coordinator reveals the bids, filters them against the budget, and records the eligible set.
 - A bid is eligible only when its requested price is within the task budget.
 - The coordinator ranks eligible bids by quality score, then by lower price, then by stable worker ID.
-- The winner receives the task allocation and the simulation reports the clearing price, runner-up, and unallocated tasks.
+- The winner receives the round allocation and the simulation reports the clearing price, runner-up, and bid commitments.
 - A fixed seed makes every run identical.
 
 ## One bounty sequence

@@ -88,6 +88,14 @@
 .loading-line.short { width: 58%; animation-delay: .12s; }
 @keyframes loading-pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 .error-state .text-btn { margin-top: 18px; color: var(--orange); }
+.simulation-list-head { display: flex; justify-content: space-between; gap: 12px; padding: 0 0 16px; color: var(--muted); font: 9px var(--mono); letter-spacing: .1em; }
+.simulation-list-head strong { color: var(--ink); font-weight: 500; }
+.simulation-flow { display: flex; gap: 8px; margin: -12px 0 28px; }
+.simulation-flow span { border: 1px solid var(--line); color: var(--muted); padding: 8px 10px; font: 9px var(--mono); }
+.simulation-flow span.done { border-color: var(--orange); color: var(--ink); background: #ff5b2d18; }
+.bid-state { color: var(--muted); font: 9px var(--mono); }
+.bid-state.winner { color: #236d55; }
+.simulation-empty { color: var(--muted); font: 11px var(--mono); padding: 28px 0 !important; }
 
 .bounty-stats {
   display: grid;
