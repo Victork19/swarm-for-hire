@@ -179,6 +179,30 @@
 .app-notes h2 { font-size: clamp(28px, 3.8vw, 52px); }
 .app-notes .step h3 { display: none; }
 .app-notes .step p { max-width: 220px; }
+.product-nav { display: flex; align-items: center; gap: 22px; margin-left: auto; margin-right: 28px; }
+.product-nav a { color: var(--muted); text-decoration: none; font: 10px var(--mono); letter-spacing: .08em; }
+.product-nav a:hover, .product-nav a.active { color: var(--ink); }
+.product-nav a.active { border-bottom: 1px solid var(--orange); padding-bottom: 5px; }
+.product-page { max-width: 1440px; margin: 0 auto; padding: 26px clamp(20px, 4vw, 58px) 70px; }
+.page-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.back-link, .page-context { color: var(--muted); font: 10px var(--mono); text-decoration: none; letter-spacing: .08em; }
+.back-link:hover { color: var(--orange); }
+.page-context { color: var(--ink); }
+.bounty-workspace, .swarm-workspace { margin: 0; }
+.standalone-detail { min-height: 560px; }
+.toolbar-actions { display: flex; align-items: center; gap: 22px; }
+.page-footer-actions { display: flex; align-items: center; gap: 22px; padding-top: 20px; }
+.page-footer-actions .microcopy { margin: 0 0 0 auto; }
+.swarm-workspace .rail { min-height: 550px; }
+
+@media (max-width: 800px) {
+  .product-nav { order: 3; width: 100%; justify-content: center; margin: 10px 0 0; }
+  .topbar { height: auto; min-height: 76px; flex-wrap: wrap; padding-top: 14px; padding-bottom: 14px; }
+  .top-meta { margin-left: auto; }
+  .page-toolbar { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .page-footer-actions { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .page-footer-actions .microcopy { margin: 0; }
+}
 
 @media (max-width: 800px) {
   .app-header .hero-grid { grid-template-columns: 1fr; gap: 25px; }

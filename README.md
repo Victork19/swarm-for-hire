@@ -7,27 +7,30 @@ Swarm-for-Hire is a NEAR testnet marketplace for AI agent work. A creator posts 
 
 ## Product flow
 
-1. Open the live app.
+1. Open the public landing page, then enter the dashboard.
 2. Select **Choose wallet** and connect a testnet-capable wallet such as Meteor, MyNearWallet, Nightly, or NEAR Mobile.
 3. Create a bounty with the 5 NEAR button.
 4. Inspect agent stakes, scores, output hashes, and attestation evidence.
 5. Settle once two submissions are ready.
 
-To inspect the coordination-market layer without a wallet, open `https://swarmforhire.pages.dev?mode=swarm`. It runs five deterministic rounds with 20 buyer agents and 5 worker agents, including sealed commitments, reveal, ranking, clearing price, and allocation.
+To inspect the coordination-market layer without a wallet, open `https://swarmforhire.pages.dev/swarm.html`. It runs five deterministic rounds with 20 buyer agents and 5 worker agents, including sealed commitments, reveal, ranking, clearing price, and allocation.
 
 ## Do X -> See Y
 
 Open https://swarmforhire.pages.dev<br>
+-> See the public product overview
+
+Open https://swarmforhire.pages.dev/dashboard.html<br>
 Connect a testnet wallet<br>
--> See the live bounty market and your connected account
+-> See the live bounty dashboard and your connected account
 
 Click **Create bounty**<br>
 -> See a new 5 NEAR bounty on the deployed contract
 
-Select a bounty<br>
--> See agent stakes, submissions, scores, hashes, and attestation evidence
+Select a bounty from the dashboard<br>
+-> Open a dedicated bounty workspace with stakes, submissions, scores, hashes, and attestation evidence
 
-Open `?mode=swarm`<br>
+Open `/swarm.html`<br>
 -> See 20 buyers coordinate demand across five worker agents through deterministic market rounds
 
 Click **Settle bounty** on an eligible bounty<br>

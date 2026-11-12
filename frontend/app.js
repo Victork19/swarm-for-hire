@@ -5,7 +5,9 @@ const RPC = 'https://rpc.testnet.near.org';
 const AGENT1 = 'agent1.swarmbuilder.testnet';
 const AGENT2 = 'agent2.swarmbuilder.testnet';
 const params = new URLSearchParams(location.search);
-const simulation = params.get('mode') === 'swarm';
+const detailRoute = location.pathname.endsWith('/bounty.html');
+const simulation = location.pathname.endsWith('/swarm.html') || params.get('mode') === 'swarm';
+const requestedBounty = Number(params.get('id'));
 // This app is deployed against the testnet contract. Requiring testnet here
 // prevents a mainnet wallet session from being selected accidentally.
 const connector = new NearConnector({ network: 'testnet', features: { signAndSendTransaction: true }, footerBranding: null });
@@ -32,6 +34,7 @@ function evidenceMeta(attestation) {
 }
 
 function renderList() {
+  if (!el('bounty-list')) return;
   el('bounty-count').textContent = String(state.bounties.length).padStart(2, '0');
   const list = el('bounty-list');
   list.setAttribute('aria-busy', state.loading ? 'true' : 'false');
@@ -39,10 +42,11 @@ function renderList() {
   if (state.error && !state.bounties.length) { list.innerHTML = errorState(); el('retry-btn')?.addEventListener('click', refreshLive); return; }
   if (!state.bounties.length) { list.innerHTML = emptyState(); return; }
   list.innerHTML = state.bounties.map((bounty) => `<button type="button" class="bounty-item ${state.selected === bounty.id ? 'active' : ''}" data-id="${bounty.id}"><span class="bounty-item-top"><span>#${String(bounty.id).padStart(3, '0')}</span><span>${escapeHtml(bounty.status).toUpperCase()}</span></span><span class="bounty-item-description">${escapeHtml(bounty.description)}</span><span class="bounty-item-foot"><span>${bounty.agents.length} / 2 AGENTS</span><span>${fmt(bounty.budget)} NEAR</span></span></button>`).join('');
-  document.querySelectorAll('.bounty-item').forEach((item) => item.addEventListener('click', () => { state.selected = Number(item.dataset.id); renderList(); renderDetail(); }));
+  document.querySelectorAll('.bounty-item').forEach((item) => item.addEventListener('click', () => { location.href = `bounty.html?id=${item.dataset.id}`; }));
 }
 
 function renderDetail() {
+  if (!el('detail')) return;
   if (state.loading && !state.loaded) {
     el('detail').innerHTML = '<div class="detail-empty detail-loading" role="status" aria-live="polite"><span class="big-mark">*</span><h2>Loading the market.</h2><p>Reading bounty state from NEAR testnet…</p></div>';
     return;
@@ -79,7 +83,7 @@ async function refreshLive() {
   try {
     const bounties = await liveView('get_bounties', {});
     state.bounties = await Promise.all(bounties.map(async (bounty) => ({ id: bounty.id, budget: Number(bounty.budget) / 1e24, description: bounty.description, status: bounty.status, winner: bounty.winner, agents: (await liveView('get_agents', { bounty_id: bounty.id })).map((agent) => ({ account: agent.account, stake: Number(agent.stake) / 1e24, submitted: Boolean(agent.output_hash), outputHash: bytesToHex(agent.output_hash), score: agent.score, attestation: agent.attestation })) })));
-    if (state.bounties.length && state.selected === null) state.selected = state.bounties[state.bounties.length - 1].id;
+    if (state.bounties.length && state.selected === null) state.selected = detailRoute && Number.isFinite(requestedBounty) ? requestedBounty : state.bounties[state.bounties.length - 1].id;
     state.loaded = true;
     state.loading = false;
     const updated = el('last-updated');
@@ -122,10 +126,9 @@ async function createLive() {
   try {
     const nextBountyId = Number(await liveView('get_next_bounty_id', {}));
     await sendFunctionCall('create_bounty', { description: 'Summarize NEAR Intents 30-day volume with a clear, evidence-backed readout.', deadline_seconds: 3600 }, parseNearAmount('5'), '100000000000000');
-    state.selected = nextBountyId;
     toast(`Bounty #${String(nextBountyId).padStart(3, '0')} created on testnet`);
     await refreshLive();
-    window.requestAnimationFrame(() => el('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    location.href = `bounty.html?id=${nextBountyId}`;
   } catch (error) { toast(`Create failed: ${error.message}`); } finally { state.busy = false; el('create-btn').disabled = false; el('create-btn').innerHTML = 'Create bounty <span>5 NEAR</span>'; }
 }
 
@@ -169,7 +172,7 @@ function renderSwarmSimulation() {
   el('advance-round')?.addEventListener('click', () => { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); });
 }
 
-async function runSwarmSimulation() { swarmState.rounds = await buildSwarmSimulation(); swarmState.round = 0; el('mode-label').textContent = 'SWARM SIMULATION'; el('showcase-btn').textContent = 'Back to live market'; el('create-btn').textContent = 'Advance round'; el('product-status').textContent = 'Deterministic 20-buyer / 5-worker market. No wallet or funds required.'; el('refresh-btn').disabled = true; el('refresh-btn').textContent = 'Simulation'; renderSwarmSimulation(); }
+async function runSwarmSimulation() { swarmState.rounds = await buildSwarmSimulation(); swarmState.round = 0; el('mode-label').textContent = 'SWARM SIMULATION'; el('showcase-btn').textContent = 'Back to dashboard'; el('create-btn').textContent = 'Advance round'; el('product-status').textContent = 'Deterministic 20-buyer / 5-worker market. No wallet or funds required.'; el('refresh-btn').disabled = true; el('refresh-btn').textContent = 'Simulation'; renderSwarmSimulation(); }
 
 connector.on('wallet:signIn', async (event) => {
   try {
@@ -186,7 +189,7 @@ connector.on('wallet:signOut', () => {
   el('product-status').textContent = 'Live product workspace. Choose a wallet to create or settle a bounty.';
   renderDetail();
 });
-el('wallet-btn').addEventListener('click', () => connectWallet().catch((error) => toast(`Wallet connection failed: ${error.message}`)));
-el('refresh-btn').addEventListener('click', () => refreshLive().then(() => toast('Market refreshed')).catch(() => {}));
-el('showcase-btn').addEventListener('click', () => { if (simulation) { location.href = location.pathname; return; } location.href = `${location.pathname}?mode=swarm`; });
-if (simulation) { el('create-btn').addEventListener('click', () => { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); }); runSwarmSimulation(); } else { el('create-btn').addEventListener('click', createLive); renderList(); refreshLive(); window.setInterval(() => { if (!state.loading) refreshLive(); }, 15000); }
+el('wallet-btn')?.addEventListener('click', () => connectWallet().catch((error) => toast(`Wallet connection failed: ${error.message}`)));
+el('refresh-btn')?.addEventListener('click', () => refreshLive().then(() => toast('Market refreshed')).catch(() => {}));
+el('showcase-btn')?.addEventListener('click', () => { if (simulation) { location.href = 'dashboard.html'; } else { location.href = 'swarm.html'; } });
+if (simulation) { el('create-btn')?.addEventListener('click', () => { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); }); runSwarmSimulation(); } else if (detailRoute) { el('create-btn')?.addEventListener('click', () => { location.href = 'dashboard.html'; }); el('create-btn').innerHTML = 'Back to dashboard <span>-&gt;</span>'; refreshLive(); } else { el('create-btn')?.addEventListener('click', createLive); renderList(); refreshLive(); window.setInterval(() => { if (!state.loading) refreshLive(); }, 15000); }

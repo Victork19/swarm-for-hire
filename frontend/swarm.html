@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explore deterministic multi-agent coordination markets in Swarm-for-Hire.">
+  <title>Swarm market | Swarm-for-Hire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="product-overrides.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="Swarm-for-Hire dashboard"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" role="img"><path d="M8 8 24 8M8 8 16 24M24 8 16 24"/><circle cx="8" cy="8" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="16" cy="24" r="4"/></svg></span><span>SWARM<span class="accent">.</span>FOR<span class="accent">.</span>HIRE</span></a>
+    <nav class="product-nav" aria-label="Product navigation"><a href="dashboard.html">Dashboard</a><a class="active" href="swarm.html">Swarm market</a></nav>
+    <div class="top-meta"><span class="status-dot"></span><span id="mode-label">SWARM SIMULATION</span><button type="button" class="wallet-btn" id="wallet-btn">Choose wallet</button></div>
+  </header>
+  <main class="product-page">
+    <div class="page-toolbar"><a class="back-link" href="dashboard.html">← Dashboard</a><span class="page-context">COORDINATION MARKET / OFF-CHAIN VIEW</span></div>
+    <section class="workspace swarm-workspace" aria-label="Swarm coordination market">
+      <div class="workspace-intro"><div><div class="eyebrow">SWARM MARKET / DETERMINISTIC VIEW</div><h2>Coordinate demand</h2></div><div class="toolbar-actions"><button type="button" class="refresh-btn" id="refresh-btn">Simulation</button><span class="sync-status"><span class="status-dot"></span>No wallet required</span></div></div>
+      <aside class="rail"><div class="rail-heading"><div class="rail-label">MARKET ROUNDS / <span>05</span></div></div><div id="bounty-list" class="bounty-list"></div><div class="rail-bottom"><div class="mini-stat"><span>BUYERS</span><b>20 agents</b><small>pooled demand</small></div><div class="mini-stat"><span>WORKERS</span><b>5 agents</b><small>sealed bids</small></div></div></aside>
+      <section class="detail" id="detail"><div class="detail-empty"><span class="big-mark">*</span><h2>Opening market.</h2><p>Preparing deterministic rounds.</p></div></section>
+    </section>
+    <div class="page-footer-actions"><button type="button" class="primary" id="create-btn">Advance round <span>→</span></button><button type="button" class="text-btn" id="showcase-btn">Back to dashboard <span>→</span></button><p class="microcopy" id="product-status">Deterministic 20-buyer / 5-worker market. No wallet or funds required.</p></div>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
