@@ -1,7 +1,7 @@
 import { NearConnector } from 'https://esm.sh/@hot-labs/near-connect?bundle';
 
 const CONTRACT = 'swarm-bounty.swarmbuilder.testnet';
-const RPC = 'https://rpc.testnet.near.org';
+const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const AGENT1 = 'agent1.swarmbuilder.testnet';
 const AGENT2 = 'agent2.swarmbuilder.testnet';
 const params = new URLSearchParams(location.search);
@@ -72,7 +72,20 @@ function renderDetail() {
 }
 
 function encodeArgs(args) { const bytes = new TextEncoder().encode(JSON.stringify(args)); let binary = ''; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary); }
-async function liveView(method, args) { const payload = { jsonrpc: '2.0', id: 'swarm-ui', method: 'query', params: { request_type: 'call_function', finality: 'final', account_id: CONTRACT, method_name: method, args_base64: encodeArgs(args) } }; const response = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error(`RPC ${response.status}`); const data = await response.json(); if (data.error) throw new Error(data.error.message || 'RPC error'); return JSON.parse(new TextDecoder().decode(Uint8Array.from(data.result.result))); }
+async function liveView(method, args) {
+  const payload = { jsonrpc: '2.0', id: 'swarm-ui', method: 'query', params: { request_type: 'call_function', finality: 'final', account_id: CONTRACT, method_name: method, args_base64: encodeArgs(args) } };
+  let lastError = new Error('No NEAR RPC endpoint responded');
+  for (const rpc of RPCS) {
+    try {
+      const response = await fetch(rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!response.ok) throw new Error(`RPC ${response.status}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message || 'RPC error');
+      return JSON.parse(new TextDecoder().decode(Uint8Array.from(data.result.result)));
+    } catch (error) { lastError = error; }
+  }
+  throw new Error(`NEAR testnet unavailable: ${lastError.message}`);
+}
 
 async function refreshLive() {
   state.loading = true;
@@ -172,7 +185,22 @@ function renderSwarmSimulation() {
   el('advance-round')?.addEventListener('click', () => { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); });
 }
 
-async function runSwarmSimulation() { swarmState.rounds = await buildSwarmSimulation(); swarmState.round = 0; el('mode-label').textContent = 'SWARM SIMULATION'; el('showcase-btn').textContent = 'Back to dashboard'; el('create-btn').textContent = 'Advance round'; el('product-status').textContent = 'Deterministic 20-buyer / 5-worker market. No wallet or funds required.'; el('refresh-btn').disabled = true; el('refresh-btn').textContent = 'Simulation'; renderSwarmSimulation(); }
+async function runSwarmSimulation() {
+  try {
+    swarmState.rounds = await buildSwarmSimulation();
+    swarmState.round = 0;
+    el('mode-label').textContent = 'SWARM SIMULATION';
+    el('showcase-btn').textContent = 'Back to dashboard';
+    el('create-btn').textContent = 'Advance round';
+    el('product-status').textContent = 'Deterministic 20-buyer / 5-worker market. No wallet or funds required.';
+    el('refresh-btn').disabled = true;
+    el('refresh-btn').textContent = 'Simulation';
+    renderSwarmSimulation();
+  } catch (error) {
+    el('product-status').textContent = 'Simulation could not initialize. Reload to try again.';
+    if (el('detail')) el('detail').innerHTML = `<div class="detail-empty"><span class="big-mark">!</span><h2>Simulation unavailable.</h2><p>${escapeHtml(error.message)}</p></div>`;
+  }
+}
 
 connector.on('wallet:signIn', async (event) => {
   try {
