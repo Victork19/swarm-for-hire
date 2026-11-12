@@ -9,14 +9,18 @@ const showcase = params.get('mode') === 'showcase';
 // This app is deployed against the testnet contract. Requiring testnet here
 // prevents a mainnet wallet session from being selected accidentally.
 const connector = new NearConnector({ network: 'testnet', features: { signAndSendTransaction: true }, footerBranding: null });
-const state = { bounties: [], selected: null, wallet: null, walletAccount: null, busy: false };
+const state = { bounties: [], selected: null, wallet: null, walletAccount: null, busy: false, loading: true, loaded: false, error: null };
 const el = (id) => document.getElementById(id);
 const fmt = (value) => Number(value).toFixed(2);
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+const bytesToHex = (value) => Array.isArray(value) ? `0x${value.map((byte) => Number(byte).toString(16).padStart(2, '0')).join('')}` : String(value ?? '');
+const shortHash = (value) => value ? `${value.slice(0, 10)}…${value.slice(-8)}` : '-';
 const demoAgents = [{ account: AGENT1, stake: 0.5, submitted: true, score: 90, attestation: 'demo-tee-quote-v2-a1b2c3d4' }, { account: AGENT2, stake: 0.5, submitted: true, score: 75, attestation: 'demo-tee-quote-v2-e5f6a7b8' }];
 
 function toast(message) { const target = el('toast'); target.textContent = message; target.classList.add('show'); window.setTimeout(() => target.classList.remove('show'), 3000); }
+function loadingState() { return '<div class="market-loading" role="status" aria-live="polite"><span class="loading-line"></span><span class="loading-line short"></span><span class="loading-line"></span><p>Reading the live NEAR market…</p></div>'; }
 function emptyState() { return '<div class="empty"><span>-</span><p>No bounty found on testnet.</p><small>Create the first task to open the market.</small></div>'; }
+function errorState() { return '<div class="empty error-state"><span>!</span><p>Market data is temporarily unavailable.</p><small>Check your connection and try again.</small><button type="button" class="text-btn" id="retry-btn">Retry market read <span>-&gt;</span></button></div>'; }
 function evidenceMeta(attestation) {
   if (!attestation) return { label: 'Awaiting evidence', className: 'pending' };
   try {
@@ -29,22 +33,33 @@ function evidenceMeta(attestation) {
 function renderList() {
   el('bounty-count').textContent = String(state.bounties.length).padStart(2, '0');
   const list = el('bounty-list');
+  list.setAttribute('aria-busy', state.loading ? 'true' : 'false');
+  if (state.loading && !state.loaded) { list.innerHTML = loadingState(); return; }
+  if (state.error && !state.bounties.length) { list.innerHTML = errorState(); el('retry-btn')?.addEventListener('click', refreshLive); return; }
   if (!state.bounties.length) { list.innerHTML = emptyState(); return; }
   list.innerHTML = state.bounties.map((bounty) => `<button type="button" class="bounty-item ${state.selected === bounty.id ? 'active' : ''}" data-id="${bounty.id}"><span class="bounty-item-top"><span>#${String(bounty.id).padStart(3, '0')}</span><span>${escapeHtml(bounty.status).toUpperCase()}</span></span><span class="bounty-item-description">${escapeHtml(bounty.description)}</span><span class="bounty-item-foot"><span>${bounty.agents.length} / 2 AGENTS</span><span>${fmt(bounty.budget)} NEAR</span></span></button>`).join('');
   document.querySelectorAll('.bounty-item').forEach((item) => item.addEventListener('click', () => { state.selected = Number(item.dataset.id); renderList(); renderDetail(); }));
 }
 
 function renderDetail() {
+  if (state.loading && !state.loaded) {
+    el('detail').innerHTML = '<div class="detail-empty detail-loading" role="status" aria-live="polite"><span class="big-mark">*</span><h2>Loading the market.</h2><p>Reading bounty state from NEAR testnet…</p></div>';
+    return;
+  }
+  if (state.error && !state.bounties.length) {
+    el('detail').innerHTML = '<div class="detail-empty"><span class="big-mark">!</span><h2>Market unavailable.</h2><p>Use Retry to request the latest on-chain state.</p></div>';
+    return;
+  }
   const bounty = state.bounties.find((item) => item.id === state.selected);
   if (!bounty) { el('detail').innerHTML = '<div class="detail-empty"><span class="big-mark">*</span><h2>Select a bounty.</h2><p>Choose a live task to inspect its agents, attestations, and settlement state.</p></div>'; return; }
   const submissions = bounty.agents.filter((agent) => agent.submitted).length;
   const canSettle = bounty.status === 'Settled' || submissions >= 2;
   const joined = state.walletAccount && bounty.agents.some((agent) => agent.account === state.walletAccount);
-  const rows = bounty.agents.map((agent) => { const account = agent.account || 'account unavailable'; const attestation = agent.attestation || ''; const evidence = evidenceMeta(attestation); return `<tr><td><span class="agent-account">${escapeHtml(account)}</span><small>${agent.submitted ? 'result received' : 'awaiting result'}</small></td><td>${fmt(agent.stake)} NEAR</td><td>${agent.submitted ? 'received' : 'pending'}</td><td>${agent.submitted ? `<span class="evidence-cell"><span class="evidence-dot ${evidence.className}"></span><code class="attestation" title="${escapeHtml(attestation)}">${escapeHtml(evidence.label)}</code></span>` : '-'}</td><td><span class="score ${bounty.winner === agent.account ? 'winner' : ''}">${agent.submitted ? escapeHtml(agent.score) : '-'}</span></td></tr>`; }).join('');
+  const rows = bounty.agents.map((agent) => { const account = agent.account || 'account unavailable'; const attestation = agent.attestation || ''; const outputHash = agent.outputHash || ''; const evidence = evidenceMeta(attestation); return `<tr><td><span class="agent-account">${escapeHtml(account)}</span><small>${agent.submitted ? 'result received' : 'awaiting result'}</small></td><td>${fmt(agent.stake)} NEAR</td><td>${agent.submitted ? 'received' : 'pending'}</td><td>${agent.submitted ? `<code class="hash" title="${escapeHtml(outputHash)}">${escapeHtml(shortHash(outputHash))}</code>` : '-'}</td><td>${agent.submitted ? `<span class="evidence-cell"><span class="evidence-dot ${evidence.className}"></span><code class="attestation" title="${escapeHtml(attestation)}">${escapeHtml(evidence.label)}</code></span>` : '-'}</td><td><span class="score ${bounty.winner === agent.account ? 'winner' : ''}">${agent.submitted ? escapeHtml(agent.score) : '-'}</span></td></tr>`; }).join('');
   const winner = bounty.winner || '';
   const payout = fmt(Number(bounty.budget) * 0.8);
   const progress = `${bounty.agents.length}/2 agents · ${submissions}/2 results`;
-  el('detail').innerHTML = `<div class="detail-header"><div><div class="detail-kicker">BOUNTY / ${String(bounty.id).padStart(3, '0')} · ${showcase ? 'SHOWCASE' : 'LIVE TESTNET'}</div><h2>${bounty.status === 'Settled' ? 'Settlement complete' : 'Agent performance'}</h2></div><span class="status-tag ${escapeHtml(bounty.status).toLowerCase()}">${escapeHtml(bounty.status)}</span></div><p class="brief">${escapeHtml(bounty.description)}</p><div class="bounty-stats"><div><span>BUDGET</span><strong>${fmt(bounty.budget)} <small>NEAR</small></strong></div><div><span>PROGRESS</span><strong>${escapeHtml(progress)}</strong></div><div><span>WINNER PAYOUT</span><strong>${payout} <small>NEAR</small></strong></div></div><div class="table-wrap"><table class="agent-table"><thead><tr><th>AGENT</th><th>STAKE</th><th>SUBMISSION</th><th>EVIDENCE</th><th>SCORE</th></tr></thead><tbody>${rows}</tbody></table></div><div class="settle-row"><p>${bounty.status === 'Settled' ? `Winner · ${escapeHtml(winner)}` : canSettle ? 'Ready for deterministic settlement' : 'Waiting for two agent results'}</p><div class="detail-actions">${!showcase && !joined && bounty.status === 'Open' ? '<button type="button" class="text-btn" id="join-btn">Join bounty / 0.5 NEAR</button>' : ''}<button type="button" class="primary" id="settle-btn" ${showcase || !canSettle || bounty.status === 'Settled' ? 'disabled' : ''}>Settle bounty <span>-&gt;</span></button></div></div>${bounty.status === 'Settled' ? `<div class="result"><div><span>WINNER</span><b>${escapeHtml(winner)}</b></div><strong>+${payout} NEAR</strong></div>` : ''}`;
+  el('detail').innerHTML = `<div class="detail-header"><div><div class="detail-kicker">BOUNTY / ${String(bounty.id).padStart(3, '0')} · ${showcase ? 'SHOWCASE' : 'LIVE TESTNET'}</div><h2>${bounty.status === 'Settled' ? 'Settlement complete' : 'Agent performance'}</h2></div><span class="status-tag ${escapeHtml(bounty.status).toLowerCase()}">${escapeHtml(bounty.status)}</span></div><p class="brief">${escapeHtml(bounty.description)}</p><div class="bounty-stats"><div><span>BUDGET</span><strong>${fmt(bounty.budget)} <small>NEAR</small></strong></div><div><span>PROGRESS</span><strong>${escapeHtml(progress)}</strong></div><div><span>WINNER PAYOUT</span><strong>${payout} <small>NEAR</small></strong></div></div><div class="table-wrap"><table class="agent-table"><thead><tr><th>AGENT</th><th>STAKE</th><th>SUBMISSION</th><th>HASH</th><th>EVIDENCE</th><th>SCORE</th></tr></thead><tbody>${rows}</tbody></table></div><div class="settle-row"><p>${bounty.status === 'Settled' ? `Winner · ${escapeHtml(winner)}` : canSettle ? 'Ready for deterministic settlement' : 'Waiting for two agent results'}</p><div class="detail-actions">${!showcase && !joined && bounty.status === 'Open' ? '<button type="button" class="text-btn" id="join-btn">Join bounty / 0.5 NEAR</button>' : ''}<button type="button" class="primary" id="settle-btn" ${showcase || !canSettle || bounty.status === 'Settled' ? 'disabled' : ''}>Settle bounty <span>-&gt;</span></button></div></div>${bounty.status === 'Settled' ? `<div class="result"><div><span>WINNER</span><b>${escapeHtml(winner)}</b></div><strong>+${payout} NEAR</strong></div>` : ''}`;
   const button = el('settle-btn');
   if (button) button.addEventListener('click', settleLive);
   const joinButton = el('join-btn');
@@ -55,12 +70,28 @@ function encodeArgs(args) { const bytes = new TextEncoder().encode(JSON.stringif
 async function liveView(method, args) { const payload = { jsonrpc: '2.0', id: 'swarm-ui', method: 'query', params: { request_type: 'call_function', finality: 'final', account_id: CONTRACT, method_name: method, args_base64: encodeArgs(args) } }; const response = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) }); if (!response.ok) throw new Error(`RPC ${response.status}`); const data = await response.json(); if (data.error) throw new Error(data.error.message || 'RPC error'); return JSON.parse(new TextDecoder().decode(Uint8Array.from(data.result.result))); }
 
 async function refreshLive() {
+  state.loading = true;
+  state.error = null;
+  if (!state.loaded) { renderList(); renderDetail(); }
+  const refreshButton = el('refresh-btn');
+  if (refreshButton) { refreshButton.disabled = true; refreshButton.textContent = 'Reading…'; }
   try {
     const bounties = await liveView('get_bounties', {});
-    state.bounties = await Promise.all(bounties.map(async (bounty) => ({ id: bounty.id, budget: Number(bounty.budget) / 1e24, description: bounty.description, status: bounty.status, winner: bounty.winner, agents: (await liveView('get_agents', { bounty_id: bounty.id })).map((agent) => ({ account: agent.account, stake: Number(agent.stake) / 1e24, submitted: Boolean(agent.output_hash), score: agent.score, attestation: agent.attestation })) })));
+    state.bounties = await Promise.all(bounties.map(async (bounty) => ({ id: bounty.id, budget: Number(bounty.budget) / 1e24, description: bounty.description, status: bounty.status, winner: bounty.winner, agents: (await liveView('get_agents', { bounty_id: bounty.id })).map((agent) => ({ account: agent.account, stake: Number(agent.stake) / 1e24, submitted: Boolean(agent.output_hash), outputHash: bytesToHex(agent.output_hash), score: agent.score, attestation: agent.attestation })) })));
     if (state.bounties.length && state.selected === null) state.selected = state.bounties[state.bounties.length - 1].id;
+    state.loaded = true;
+    state.loading = false;
+    const updated = el('last-updated');
+    if (updated) updated.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     renderList(); renderDetail();
-  } catch (error) { renderList(); toast(`Market read failed: ${error.message}`); }
+  } catch (error) {
+    state.loading = false;
+    state.error = error;
+    renderList();
+    toast(`Market read failed: ${error.message}`);
+  } finally {
+    if (refreshButton) { refreshButton.disabled = false; refreshButton.textContent = 'Refresh'; }
+  }
 }
 
 async function connectWallet() {
@@ -98,11 +129,15 @@ async function createLive() {
 }
 
 async function settleLive() {
-  try { await sendFunctionCall('settle', { bounty_id: state.selected }, '0', '100000000000000'); toast('Settlement submitted to NEAR'); await refreshLive(); } catch (error) { toast(`Settlement failed: ${error.message}`); }
+  const button = el('settle-btn');
+  if (button) { button.disabled = true; button.textContent = 'Settling…'; }
+  try { await sendFunctionCall('settle', { bounty_id: state.selected }, '0', '100000000000000'); toast('Settlement submitted to NEAR'); await refreshLive(); } catch (error) { toast(`Settlement failed: ${error.message}`); renderDetail(); }
 }
 
 async function joinLive(bountyId) {
-  try { await sendFunctionCall('join_bounty', { bounty_id: bountyId }, parseNearAmount('0.5'), '50000000000000'); toast('Agent stake submitted to NEAR'); await refreshLive(); } catch (error) { toast(`Join failed: ${error.message}`); }
+  const button = el('join-btn');
+  if (button) { button.disabled = true; button.textContent = 'Joining…'; }
+  try { await sendFunctionCall('join_bounty', { bounty_id: bountyId }, parseNearAmount('0.5'), '50000000000000'); toast('Agent stake submitted to NEAR'); await refreshLive(); } catch (error) { toast(`Join failed: ${error.message}`); renderDetail(); }
 }
 
 function runShowcase() { state.bounties = [{ id: 0, budget: 5, description: 'Summarize NEAR Intents 30-day volume with a clear, evidence-backed readout.', status: 'Open', agents: [] }]; state.selected = 0; renderList(); renderDetail(); window.setTimeout(() => { state.bounties[0].agents = demoAgents.map((agent) => ({ ...agent })); renderList(); renderDetail(); toast('Showcase workers returned attested output'); }, 900); window.setTimeout(() => { state.bounties[0].status = 'Settled'; state.bounties[0].winner = AGENT1; renderList(); renderDetail(); toast('Showcase settlement completed'); }, 1800); }
@@ -126,4 +161,4 @@ el('wallet-btn').addEventListener('click', () => connectWallet().catch((error) =
 el('refresh-btn').addEventListener('click', () => refreshLive().then(() => toast('Market refreshed')).catch(() => {}));
 if (!showcase) el('create-btn').addEventListener('click', createLive);
 el('showcase-btn').addEventListener('click', () => { if (showcase) { location.href = location.pathname; return; } location.href = `${location.pathname}?mode=showcase`; });
-if (showcase) { el('mode-label').textContent = 'SHOWCASE MODE'; el('showcase-btn').textContent = 'Back to live market'; el('create-btn').textContent = 'Run showcase'; el('create-btn').addEventListener('click', runShowcase); el('product-status').textContent = 'Deterministic walkthrough. No wallet or funds required.'; runShowcase(); } else { renderList(); refreshLive(); }
+if (showcase) { el('mode-label').textContent = 'SHOWCASE MODE'; el('showcase-btn').textContent = 'Back to live market'; el('create-btn').textContent = 'Run showcase'; el('create-btn').addEventListener('click', runShowcase); el('product-status').textContent = 'Deterministic walkthrough. No wallet or funds required.'; runShowcase(); } else { renderList(); refreshLive(); window.setInterval(() => { if (!state.loading) refreshLive(); }, 15000); }
