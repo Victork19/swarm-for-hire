@@ -1,5 +1,3 @@
-import { NearConnector } from 'https://esm.sh/@hot-labs/near-connect?bundle';
-
 const CONTRACT = 'swarm-bounty.swarmbuilder.testnet';
 const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const AGENT1 = 'agent1.swarmbuilder.testnet';
@@ -10,7 +8,7 @@ const simulation = location.pathname.endsWith('/swarm.html') || params.get('mode
 const requestedBounty = Number(params.get('id'));
 // This app is deployed against the testnet contract. Requiring testnet here
 // prevents a mainnet wallet session from being selected accidentally.
-const connector = new NearConnector({ network: 'testnet', features: { signAndSendTransaction: true }, footerBranding: null });
+let connector = null;
 const state = { bounties: [], selected: null, wallet: null, walletAccount: null, busy: false, loading: true, loaded: false, error: null };
 const el = (id) => document.getElementById(id);
 const fmt = (value) => Number(value).toFixed(2);
@@ -113,6 +111,11 @@ async function refreshLive() {
 }
 
 async function connectWallet() {
+  if (!connector) {
+    const { NearConnector } = await import('https://esm.sh/@hot-labs/near-connect?bundle');
+    connector = new NearConnector({ network: 'testnet', features: { signAndSendTransaction: true }, footerBranding: null });
+    registerWalletEvents();
+  }
   await connector.connect();
 }
 
@@ -202,21 +205,23 @@ async function runSwarmSimulation() {
   }
 }
 
-connector.on('wallet:signIn', async (event) => {
-  try {
-    state.wallet = await connector.wallet();
-    state.walletAccount = event.accounts?.[0]?.accountId || event.accounts?.[0]?.account_id || '';
-    el('wallet-btn').textContent = state.walletAccount || 'Wallet connected';
-    el('product-status').textContent = `Connected as ${state.walletAccount}. Create a real bounty on NEAR testnet.`;
+function registerWalletEvents() {
+  connector.on('wallet:signIn', async (event) => {
+    try {
+      state.wallet = await connector.wallet();
+      state.walletAccount = event.accounts?.[0]?.accountId || event.accounts?.[0]?.account_id || '';
+      el('wallet-btn').textContent = state.walletAccount || 'Wallet connected';
+      el('product-status').textContent = `Connected as ${state.walletAccount}. Create a real bounty on NEAR testnet.`;
+      renderDetail();
+      toast('Wallet connected');
+    } catch (error) { toast(`Wallet setup failed: ${error.message}`); }
+  });
+  connector.on('wallet:signOut', () => {
+    state.wallet = null; state.walletAccount = null; el('wallet-btn').textContent = 'Choose wallet';
+    el('product-status').textContent = 'Live product workspace. Choose a wallet to create or settle a bounty.';
     renderDetail();
-    toast('Wallet connected');
-  } catch (error) { toast(`Wallet setup failed: ${error.message}`); }
-});
-connector.on('wallet:signOut', () => {
-  state.wallet = null; state.walletAccount = null; el('wallet-btn').textContent = 'Choose wallet';
-  el('product-status').textContent = 'Live product workspace. Choose a wallet to create or settle a bounty.';
-  renderDetail();
-});
+  });
+}
 el('wallet-btn')?.addEventListener('click', () => connectWallet().catch((error) => toast(`Wallet connection failed: ${error.message}`)));
 el('refresh-btn')?.addEventListener('click', () => refreshLive().then(() => toast('Market refreshed')).catch(() => {}));
 el('showcase-btn')?.addEventListener('click', () => { if (simulation) { location.href = 'dashboard.html'; } else { location.href = 'swarm.html'; } });
