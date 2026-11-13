@@ -39,7 +39,8 @@ function agentEvidenceMeta(agent) {
 function verificationSummary(agents) {
   const verified = agents.filter((agent) => agent.verified).length;
   const liveEvidence = agents.filter((agent) => agentEvidenceMeta(agent).className === 'live').length;
-  return `<div class="verification-panel"><div><span class="panel-kicker">VERIFICATION GATE</span><strong>${verified}/${agents.length} cryptographically verified</strong><small>${liveEvidence} live TEE response bundle${liveEvidence === 1 ? '' : 's'} collected · official verifier required before trusted scoring</small></div><div class="policy-chip"><span>REVIEW POLICY</span><b>MIN SCORE 70</b></div></div>`;
+  const label = verified === agents.length && agents.length ? 'Cryptographically verified' : 'Evidence collected / not verified on-chain';
+  return `<div class="verification-panel"><div><span class="panel-kicker">VERIFICATION GATE</span><strong>${verified}/${agents.length} cryptographically verified</strong><small>${liveEvidence} live TEE response bundle${liveEvidence === 1 ? '' : 's'} collected · ${escapeHtml(label)}</small></div><div class="policy-chip"><span>REVIEW POLICY</span><b>MIN SCORE 70</b></div></div>`;
 }
 
 function renderList() {
@@ -47,6 +48,8 @@ function renderList() {
   el('bounty-count').textContent = String(state.bounties.length).padStart(2, '0');
   const list = el('bounty-list');
   list.setAttribute('aria-busy', state.loading ? 'true' : 'false');
+  const staleBanner = el('stale-banner');
+  if (staleBanner) { staleBanner.hidden = !state.error || !state.bounties.length; staleBanner.innerHTML = state.error && state.bounties.length ? `Showing last confirmed state · ${escapeHtml(state.error.message)} <button type="button" class="text-btn" id="stale-retry">Retry</button>` : ''; staleBanner.querySelector('#stale-retry')?.addEventListener('click', refreshLive); }
   if (state.loading && !state.loaded) { list.innerHTML = loadingState(); return; }
   if (state.error && !state.bounties.length) { list.innerHTML = errorState(); el('retry-btn')?.addEventListener('click', refreshLive); return; }
   if (!state.bounties.length) { list.innerHTML = emptyState(); return; }
@@ -97,7 +100,7 @@ function renderDetail() {
   const settlementState = bounty.status === 'Settled' ? 'SETTLED ON-CHAIN' : canSettle ? 'READY TO SETTLE' : 'COLLECTING RESULTS';
   const settlementClass = bounty.status === 'Settled' ? 'done' : canSettle ? 'ready' : 'waiting';
   el('detail').innerHTML = `<div class="bounty-command"><div><div class="detail-kicker">BOUNTY / ${String(bounty.id).padStart(3, '0')} · ${simulation ? 'SIMULATION' : 'LIVE TESTNET'}</div><h2>${escapeHtml(bounty.description)}</h2><div class="command-meta"><span class="status-tag ${escapeHtml(bounty.status).toLowerCase()}">${escapeHtml(bounty.status)}</span><span class="command-meta-text">${escapeHtml(progress)} · finality read</span></div></div><div class="command-actions">${!simulation && !joined && bounty.status === 'Open' ? '<button type="button" class="text-btn" id="join-btn">Join bounty / 0.5 NEAR</button>' : ''}<button type="button" class="primary" id="settle-btn" ${simulation || !canSettle || bounty.status === 'Settled' ? 'disabled' : ''}>${bounty.status === 'Settled' ? 'Settled' : 'Settle bounty'} <span>-&gt;</span></button></div></div><div class="bounty-overview"><div><span>BOUNTY BUDGET</span><strong>${fmt(bounty.budget)} <small>NEAR</small></strong><small>Escrowed task value</small></div><div><span>AGENTS</span><strong>${bounty.agents.length}<small>/ 2</small></strong><small>${submissions} results received</small></div><div><span>WINNER PAYOUT</span><strong>${payout}<small>NEAR</small></strong><small>80% of task budget</small></div><div><span>SETTLEMENT</span><strong>${bounty.status === 'Settled' ? 'DONE' : canSettle ? 'READY' : 'OPEN'}</strong><small>${escapeHtml(settlementState.toLowerCase())}</small></div></div><div class="workspace-section-heading"><div><span class="panel-kicker">AGENT EVIDENCE</span><h3>Compare submissions</h3></div><p>${bounty.status === 'Settled' ? `Paid to ${escapeHtml(winner)}` : canSettle ? 'All required results are in' : 'Waiting for two agent results'}</p></div><div class="agent-grid">${cards || '<div class="agent-empty">No agents have joined this bounty yet.</div>'}</div><div class="settlement-strip"><div><span class="panel-kicker">SETTLEMENT STATUS</span><strong>${escapeHtml(settlementState)}</strong><small>${bounty.status === 'Settled' ? `The contract selected ${escapeHtml(winner)} and released the payout on NEAR.` : canSettle ? 'The deterministic policy can settle this bounty once a wallet signs.' : 'Each joined agent posts a result and attestation before settlement becomes available.'}</small></div><span class="settlement-state ${settlementClass}">${bounty.status === 'Settled' ? '✓ FINAL' : canSettle ? '● ACTION AVAILABLE' : '○ IN PROGRESS'}</span></div>${bounty.status === 'Settled' ? `<div class="result"><div><span>WINNER</span><b>${escapeHtml(winner)}</b></div><strong>+${payout} NEAR</strong></div>` : ''}`;
-  el('detail')?.querySelector('.bounty-overview')?.insertAdjacentHTML('afterend', `${verificationSummary(bounty.agents)}<div class="intent-panel"><span class="panel-kicker">SETTLEMENT RAIL</span><strong>NEAR Intents adapter available</strong><small>Authenticated backend route: <code>/v1/intents/settle</code>. This testnet bounty uses native NEAR unless an Intents agent and route are configured.</small></div>`);
+  el('detail')?.querySelector('.bounty-overview')?.insertAdjacentHTML('afterend', `${verificationSummary(bounty.agents)}<div class="intent-panel"><span class="panel-kicker">INTENTS PATH</span><strong>Backend route ready · native NEAR used for this testnet settlement</strong><small>Authenticated adapter endpoint: <code>/v1/intents/settle</code>. A real solver route is required before this bounty can claim Intents payment.</small></div>`);
   el('settle-btn')?.addEventListener('click', settleLive);
   el('join-btn')?.addEventListener('click', () => joinLive(bounty.id));
 }
@@ -281,6 +284,8 @@ async function runSwarmSimulation() {
   } catch (error) {
     el('product-status').textContent = 'Simulation could not initialize. Reload to try again.';
     if (el('product-status')) el('product-status').textContent = liveSwarm ? 'Showing the last verified market snapshot. Refresh chain to retry live RPC.' : 'Simulation could not initialize. Reload to try again.';
+    if (liveSwarm && el('detail')) el('detail').innerHTML = '<div class="detail-empty"><span class="big-mark">!</span><h2>Live coordinator unavailable.</h2><p>Refresh the chain to retry. No live market state is being presented as current.</p><button type="button" class="text-btn" id="live-retry">Retry market read <span>-&gt;</span></button></div>';
+    el('live-retry')?.addEventListener('click', runSwarmSimulation);
   }
 }
 
