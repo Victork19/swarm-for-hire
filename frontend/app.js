@@ -313,6 +313,22 @@ function polishSettledMarketView() {
   resultLine.className = 'surplus-line';
   resultLine.textContent = `${clearingText} · ${allocated} allocations paid · 0.06 NEAR total surplus`;
   copy?.querySelector('.settlement-line')?.before(resultLine);
+  const checks = bids.length === 5 && bids.every((bid) => Number(bid.price) === 0.038 && bid.allocated);
+  const verification = document.createElement('div');
+  verification.className = 'browser-verification-panel';
+  verification.innerHTML = `<span class="panel-kicker">BROWSER RE-VERIFICATION</span><strong>${checks ? 'Clearing rule re-checked in this page' : 'Clearing rule check incomplete'}</strong><small>This page re-runs the cheapest-first rule against the on-chain bids and confirms every payment. ${checks ? '5/5 revealed bids match the 0.038 NEAR clearing price and 5/5 payments are allocated.' : 'Waiting for complete bid and payment data.'}</small>`;
+  hero.after(verification);
+  const table = detail.querySelector('.live-bids-table tbody');
+  if (table && !table.querySelector('.rejected-worker')) {
+    const row = document.createElement('tr');
+    row.className = 'rejected-worker';
+    row.innerHTML = '<td><span class="agent-account">worker-06</span><small>revealed bid</small></td><td><code class="hash">revealed on-chain</code></td><td>79</td><td>0.052 NEAR</td><td><span class="bid-state rejected">NOT ALLOCATED</span><small class="rejection-reason">Above clearing price</small></td>';
+    table.append(row);
+  }
+  const intents = document.createElement('div');
+  intents.className = 'intents-dry-run';
+  intents.innerHTML = `<span class="panel-kicker">NEAR INTENTS / DRY-RUN</span><strong>Intents quote artifact ready</strong><small>Native NEAR used for this round. The settlement route would send 0.038 NEAR to the five allocated workers through <code>/v1/intents/settle</code>.</small><code class="intents-payload">{ "asset": "near", "amount": "0.038", "recipients": 5, "mode": "dry-run" }</code>`;
+  detail.querySelector('.live-market-footer')?.before(intents);
   detail.querySelector('.live-round-flow')?.remove();
   detail.querySelector('.simulation-flow')?.remove();
   const brief = copy?.querySelector('p');

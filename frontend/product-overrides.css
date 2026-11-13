@@ -350,6 +350,13 @@
 .settled-market-hero .settlement-line { margin-top: 14px; }
 .settled-market-hero .settlement-line a { color: var(--ink); text-decoration: underline; word-break: break-all; }
 .settled-market-hero .surplus-line { margin: 12px 0 0; color: var(--ink); font: 11px var(--mono); }
+.browser-verification-panel, .intents-dry-run { margin: 24px 0; padding: 16px 18px; border: 1px solid var(--line); background: #f5f1e9; }
+.browser-verification-panel strong, .intents-dry-run strong { display: block; margin: 5px 0; font: 600 13px var(--sans); }
+.browser-verification-panel small, .intents-dry-run small { display: block; max-width: 760px; color: var(--muted); font: 10px/1.5 var(--mono); }
+.intents-payload { display: block; margin-top: 10px; color: var(--ink); font: 10px var(--mono); white-space: normal; }
+.rejected-worker { background: #fff4ef; }
+.rejected-worker .bid-state.rejected { color: #a33c20; border-color: #d79a84; }
+.rejection-reason { display: block; margin-top: 5px; color: #a33c20; font: 9px var(--mono); }
 .live-savings-hero small { font-size: 13px; letter-spacing: 0; }
 .live-savings-hero em { display: block; margin-top: 7px; color: var(--muted); font: 10px var(--mono); font-style: normal; }
 .live-market-proof { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--line); margin-bottom: 30px; }
