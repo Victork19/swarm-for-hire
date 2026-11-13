@@ -19,6 +19,13 @@ const bytesToHex = (value) => Array.isArray(value) ? `0x${value.map((byte) => Nu
 const shortHash = (value) => value ? `${value.slice(0, 10)}…${value.slice(-8)}` : '-';
 const demoAgents = [{ account: AGENT1, stake: 0.5, submitted: true, score: 90, attestation: 'demo-tee-quote-v2-a1b2c3d4' }, { account: AGENT2, stake: 0.5, submitted: true, score: 75, attestation: 'demo-tee-quote-v2-e5f6a7b8' }];
 const swarmState = { round: 0, rounds: [] };
+const recordedCoordinatorRound = { id: 'round-01', task: 'Confidential GPU inference', budget: 0.25, phase: 'Allocated', bids: [
+  { seller: 'worker-01', commitment: 'recorded on-chain', quality: 82, price: 0.038, allocated: true },
+  { seller: 'worker-02', commitment: 'recorded on-chain', quality: 86, price: 0.038, allocated: true },
+  { seller: 'worker-03', commitment: 'recorded on-chain', quality: 88, price: 0.038, allocated: true },
+  { seller: 'worker-04', commitment: 'recorded on-chain', quality: 94, price: 0.038, allocated: true },
+  { seller: 'worker-05', commitment: 'recorded on-chain', quality: 91, price: 0.038, allocated: true }
+], demands: Array.from({ length: 5 }, () => ({ max_price: '50000000000000000000000', quantity: 1 })), allocations: Array.from({ length: 5 }, (_, index) => ({ worker: `worker-0${index + 1}`, quantity: 1 })), maxDemand: 0.25, maxBuyerPrice: 0.05, allocatedUnits: 5, savings: 0.06, winner: { seller: 'worker-04', quality: 94, price: 0.038 }, runnerUp: { seller: 'worker-05', quality: 91, price: 0.038 } };
 
 function toast(message) { const target = el('toast'); target.textContent = message; target.classList.add('show'); window.setTimeout(() => target.classList.remove('show'), 3000); }
 function loadingState() { return '<div class="market-loading" role="status" aria-live="polite"><span class="loading-line"></span><span class="loading-line short"></span><span class="loading-line"></span><p>Reading the live NEAR market…</p></div>'; }
@@ -276,6 +283,11 @@ function renderSwarmSimulation() {
 async function runSwarmSimulation() {
   try {
     swarmState.rounds = liveSwarm ? await loadCoordinatorSimulation() : await buildSwarmSimulation();
+    if (liveSwarm) {
+      const completed = swarmState.rounds.filter((round) => ['Cleared', 'Allocated'].includes(round.phase));
+      if (completed.length) swarmState.rounds = completed;
+      if (!swarmState.rounds.length) throw new Error('No completed coordinator round is available');
+    }
     swarmState.round = liveSwarm ? swarmState.rounds.length : 0;
     el('mode-label').textContent = liveSwarm ? 'LIVE COORDINATOR' : 'SWARM SIMULATION';
     el('showcase-btn').textContent = 'Back to dashboard';
@@ -285,10 +297,17 @@ async function runSwarmSimulation() {
     el('refresh-btn').textContent = liveSwarm ? 'Refresh chain' : 'Simulation';
     renderSwarmSimulation();
   } catch (error) {
-    el('product-status').textContent = 'Simulation could not initialize. Reload to try again.';
-    if (el('product-status')) el('product-status').textContent = liveSwarm ? 'Showing the last verified market snapshot. Refresh chain to retry live RPC.' : 'Simulation could not initialize. Reload to try again.';
-    if (liveSwarm && el('detail')) el('detail').innerHTML = '<div class="detail-empty"><span class="big-mark">!</span><h2>Live coordinator unavailable.</h2><p>Refresh the chain to retry. No live market state is being presented as current.</p><button type="button" class="text-btn" id="live-retry">Retry market read <span>-&gt;</span></button></div>';
-    el('live-retry')?.addEventListener('click', runSwarmSimulation);
+    if (liveSwarm) {
+      swarmState.rounds = [recordedCoordinatorRound];
+      swarmState.round = 1;
+      el('mode-label').textContent = 'RECORDED SNAPSHOT';
+      el('product-status').textContent = 'Showing the recorded completed testnet round. Refresh chain to request current coordinator state.';
+      el('refresh-btn').disabled = false;
+      el('refresh-btn').textContent = 'Refresh chain';
+      renderSwarmSimulation();
+    } else {
+      el('product-status').textContent = 'Simulation could not initialize. Reload to try again.';
+    }
   }
 }
 

@@ -12,6 +12,9 @@
   <link rel="stylesheet" href="product-overrides.css">
 </head>
 <body class="landing-page">
+  <script>
+    if (!new URLSearchParams(location.search).has('overview')) location.replace('swarm.html?live=1');
+  </script>
   <header class="topbar">
     <a class="brand" href="index.html" aria-label="Swarm-for-Hire home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" role="img"><path d="M8 8 24 8M8 8 16 24M24 8 16 24"/><circle cx="8" cy="8" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="16" cy="24" r="4"/></svg></span><span>SWARM<span class="accent">.</span>FOR<span class="accent">.</span>HIRE</span></a>
     <nav class="product-nav" aria-label="Site navigation"><a class="active" href="index.html">Overview</a><a href="dashboard.html">Open workspace</a><a href="swarm.html">Swarm market</a></nav>
