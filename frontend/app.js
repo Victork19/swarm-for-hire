@@ -4,8 +4,8 @@ const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'
 const AGENT1 = 'agent1.swarmbuilder.testnet';
 const AGENT2 = 'agent2.swarmbuilder.testnet';
 const params = new URLSearchParams(location.search);
-const detailRoute = location.pathname.endsWith('/bounty.html');
-const simulation = location.pathname.endsWith('/swarm.html') || params.get('mode') === 'swarm';
+const detailRoute = /\/bounty(?:\.html)?\/?$/.test(location.pathname);
+const simulation = /\/swarm(?:\.html)?\/?$/.test(location.pathname) || params.get('mode') === 'swarm';
 const liveSwarm = simulation && params.get('live') === '1';
 const requestedBounty = Number(params.get('id'));
 // This app is deployed against the testnet contract. Requiring testnet here
