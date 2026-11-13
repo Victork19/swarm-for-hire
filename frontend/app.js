@@ -60,7 +60,8 @@ function renderList() {
   if (state.loading && !state.loaded) { list.innerHTML = loadingState(); return; }
   if (state.error && !state.bounties.length) { list.innerHTML = errorState(); el('retry-btn')?.addEventListener('click', refreshLive); return; }
   if (!state.bounties.length) { list.innerHTML = emptyState(); return; }
-  list.innerHTML = state.bounties.map((bounty) => `<button type="button" class="bounty-item ${state.selected === bounty.id ? 'active' : ''}" data-id="${bounty.id}"><span class="bounty-item-top"><span>#${String(bounty.id).padStart(3, '0')}</span><span>${escapeHtml(bounty.status).toUpperCase()}</span></span><span class="bounty-item-description">${escapeHtml(bounty.description)}</span><span class="bounty-item-foot"><span>${bounty.agents.length} / 2 AGENTS</span><span>${fmt(bounty.budget)} NEAR</span></span></button>`).join('');
+  const visibleBounties = state.bounties.slice(-1);
+  list.innerHTML = visibleBounties.map((bounty) => `<button type="button" class="bounty-item ${state.selected === bounty.id ? 'active' : ''}" data-id="${bounty.id}"><span class="bounty-item-top"><span>#${String(bounty.id).padStart(3, '0')}</span><span>${escapeHtml(bounty.status).toUpperCase()}</span></span><span class="bounty-item-description">${escapeHtml((bounty.description || 'Agent task').split(/[.!?]/)[0])}</span></button>`).join('') + (state.bounties.length > 1 ? '<small class="earlier-flow-note">Showing the latest bounty only. Earlier test bounties remain on-chain.</small>' : '');
   document.querySelectorAll('.bounty-item').forEach((item) => item.addEventListener('click', () => { location.href = `bounty.html?id=${item.dataset.id}`; }));
 }
 
@@ -91,6 +92,16 @@ function renderLegacyDetail() {
   el('detail')?.querySelector('.brief')?.insertAdjacentHTML('afterend', `${verificationSummary(bounty.agents)}<div class="intent-panel"><span class="panel-kicker">SETTLEMENT RAIL</span><strong>NEAR Intents adapter available</strong><small>Authenticated backend route: <code>/v1/intents/settle</code>. This testnet bounty uses native NEAR unless an Intents agent and route are configured.</small></div>`);
 }
 
+function polishBountyDetail() {
+  const detail = el('detail');
+  if (!detail) return;
+  detail.querySelectorAll('.agent-card-proof > div:nth-child(2) code').forEach((node) => { node.textContent = 'TEE evidence bundle collected (nonce present). Full cryptographic verification not enforced on-chain.'; node.removeAttribute('title'); });
+  const intent = detail.querySelector('.intent-panel small');
+  if (intent) intent.textContent = 'Settlement used native NEAR. Intents adapter is available at /v1/intents/settle (requires funded agent).';
+  const result = detail.querySelector('.result');
+  if (result && !detail.querySelector('.legacy-flow-note')) { const note = document.createElement('p'); note.className = 'legacy-flow-note'; note.textContent = 'This bounty used score-based selection. The primary product uses cheapest-first clearing (see live market).'; result.after(note); }
+}
+
 function renderDetail() {
   if (!el('detail')) return;
   if (state.loading && !state.loaded) { el('detail').innerHTML = '<div class="detail-empty detail-loading" role="status" aria-live="polite"><span class="big-mark">*</span><h2>Loading the market.</h2><p>Reading bounty state from NEAR testnet…</p></div>'; return; }
@@ -108,6 +119,7 @@ function renderDetail() {
   const settlementClass = bounty.status === 'Settled' ? 'done' : canSettle ? 'ready' : 'waiting';
   el('detail').innerHTML = `<div class="bounty-command"><div><div class="detail-kicker">BOUNTY / ${String(bounty.id).padStart(3, '0')} · ${simulation ? 'SIMULATION' : 'LIVE TESTNET'}</div><h2>${escapeHtml(bounty.description)}</h2><div class="command-meta"><span class="status-tag ${escapeHtml(bounty.status).toLowerCase()}">${escapeHtml(bounty.status)}</span><span class="command-meta-text">${escapeHtml(progress)} · finality read</span></div></div><div class="command-actions">${!simulation && !joined && bounty.status === 'Open' ? '<button type="button" class="text-btn" id="join-btn">Join bounty / 0.5 NEAR</button>' : ''}<button type="button" class="primary" id="settle-btn" ${simulation || !canSettle || bounty.status === 'Settled' ? 'disabled' : ''}>${bounty.status === 'Settled' ? 'Settled' : 'Settle bounty'} <span>-&gt;</span></button></div></div><div class="bounty-overview"><div><span>BOUNTY BUDGET</span><strong>${fmt(bounty.budget)} <small>NEAR</small></strong><small>Escrowed task value</small></div><div><span>AGENTS</span><strong>${bounty.agents.length}<small>/ 2</small></strong><small>${submissions} results received</small></div><div><span>WINNER PAYOUT</span><strong>${payout}<small>NEAR</small></strong><small>80% of task budget</small></div><div><span>SETTLEMENT</span><strong>${bounty.status === 'Settled' ? 'DONE' : canSettle ? 'READY' : 'OPEN'}</strong><small>${escapeHtml(settlementState.toLowerCase())}</small></div></div><div class="workspace-section-heading"><div><span class="panel-kicker">AGENT EVIDENCE</span><h3>Compare submissions</h3></div><p>${bounty.status === 'Settled' ? `Paid to ${escapeHtml(winner)}` : canSettle ? 'All required results are in' : 'Waiting for two agent results'}</p></div><div class="agent-grid">${cards || '<div class="agent-empty">No agents have joined this bounty yet.</div>'}</div><div class="settlement-strip"><div><span class="panel-kicker">SETTLEMENT STATUS</span><strong>${escapeHtml(settlementState)}</strong><small>${bounty.status === 'Settled' ? `The contract selected ${escapeHtml(winner)} and released the payout on NEAR.` : canSettle ? 'The deterministic policy can settle this bounty once a wallet signs.' : 'Each joined agent posts a result and attestation before settlement becomes available.'}</small></div><span class="settlement-state ${settlementClass}">${bounty.status === 'Settled' ? '✓ FINAL' : canSettle ? '● ACTION AVAILABLE' : '○ IN PROGRESS'}</span></div>${bounty.status === 'Settled' ? `<div class="result"><div><span>WINNER</span><b>${escapeHtml(winner)}</b></div><strong>+${payout} NEAR</strong></div>` : ''}`;
   el('detail')?.querySelector('.bounty-overview')?.insertAdjacentHTML('afterend', `<div class="intent-panel"><span class="panel-kicker">SETTLEMENT RAIL</span><strong>Native NEAR settlement recorded on testnet</strong><small>NEAR Intents adapter is documented as a future route; this bounty does not claim Intents payment.</small><a class="proof-link" href="https://testnet.nearblocks.io/address/${CONTRACT}" target="_blank" rel="noreferrer">Inspect bounty contract state -&gt;</a></div>`);
+  polishBountyDetail();
   el('settle-btn')?.addEventListener('click', settleLive);
   el('join-btn')?.addEventListener('click', () => joinLive(bounty.id));
 }
