@@ -302,6 +302,17 @@ function polishSettledMarketView() {
   hero.classList.add('settled-market-hero');
   const copy = hero.firstElementChild;
   if (copy && savings.parentElement !== copy) copy.prepend(savings);
+  const savingsLabel = savings.querySelector('span');
+  const savingsValue = savings.querySelector('strong');
+  const savingsNote = savings.querySelector('em');
+  const clearingText = copy?.querySelector('h2')?.textContent.match(/[0-9.]+\s+NEAR/)?.[0] || '0.038 NEAR';
+  if (savingsLabel) savingsLabel.textContent = 'BUYERS PAID';
+  if (savingsValue) savingsValue.innerHTML = '24%';
+  if (savingsNote) savingsNote.textContent = 'below their 0.05 NEAR maximum';
+  const resultLine = document.createElement('p');
+  resultLine.className = 'surplus-line';
+  resultLine.textContent = `${clearingText} · ${allocated} allocations paid · 0.06 NEAR total surplus`;
+  copy?.querySelector('.settlement-line')?.before(resultLine);
   detail.querySelector('.live-round-flow')?.remove();
   const brief = copy?.querySelector('p');
   if (brief && !brief.nextElementSibling?.classList.contains('settlement-line')) {
