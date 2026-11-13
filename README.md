@@ -1,5 +1,9 @@
 # Swarm-for-Hire
 
+1. Open https://swarmforhire.pages.dev/swarm.html?live=1
+2. See Round 1 cleared at 0.038 NEAR with 0.06 NEAR buyer savings
+3. Confirm settlement transaction `FXPLtAdy49pF7FahgT31jTzEk813ohEErEYVbKSQhaHi` on [NEAR Explorer](https://testnet.nearblocks.io/txns/FXPLtAdy49pF7FahgT31jTzEk813ohEErEYVbKSQhaHi)
+
 Swarm-for-Hire is a live NEAR testnet coordination market. Buyer subaccounts lock demand, worker subaccounts commit sealed bids, the coordinator clears eligible supply, and settlement moves value according to the market rule. The bounty workspace remains available for attested task execution.
 
 **Landing page:** https://swarmforhire.pages.dev<br>

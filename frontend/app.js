@@ -241,19 +241,22 @@ async function loadCoordinatorSimulation() {
     const bids = rawBids.filter((bid) => bid.price !== null && Number(bid.price) / 1e24 <= budget).map((bid) => ({ seller: bid.worker, commitment: bytesToHex(bid.commitment), quality: bid.quality || 0, price: Number(bid.price) / 1e24, allocated: allocatedWorkers.has(bid.worker) }));
     bids.sort((a, b) => b.quality - a.quality || a.price - b.price || a.seller.localeCompare(b.seller));
     const maxDemand = rawDemands.reduce((sum, demand) => sum + Number(demand.max_price) / 1e24 * Number(demand.quantity), 0);
+    const maxBuyerPrice = rawDemands.length ? Number(rawDemands[0].max_price) / 1e24 : 0;
     const clearing = Number(item.clearing_price || 0) / 1e24;
     const allocatedUnits = rawAllocations.reduce((sum, allocation) => sum + Number(allocation.quantity), 0);
     const leadAllocation = rawAllocations[0];
     const leadBid = bids.find((bid) => bid.seller === item.winner) || bids.find((bid) => bid.seller === leadAllocation?.worker) || bids[0] || null;
     const winner = leadBid ? { ...leadBid, price: clearing || leadBid.price } : null;
-    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, phase: item.phase, bids, demands: rawDemands, allocations: rawAllocations, maxDemand, allocatedUnits, savings: Math.max(0, maxDemand - clearing * allocatedUnits), winner, runnerUp: bids[1] || null };
+    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, phase: item.phase, bids, demands: rawDemands, allocations: rawAllocations, maxDemand, maxBuyerPrice, allocatedUnits, savings: Math.max(0, maxDemand - clearing * allocatedUnits), winner, runnerUp: bids[1] || null };
   }));
 }
 
 function marketEconomics(round) {
   if (!liveSwarm || !round) return '';
   const savings = round.savings || 0;
-  return `<div class="market-economics"><div><span class="panel-kicker">LIVE MARKET ECONOMICS</span><strong>${round.demands?.length || 0} buyer intents · ${round.allocatedUnits || 0} units allocated</strong><small>Clearing price ${round.winner ? round.winner.price.toFixed(2) : '—'} NEAR · max demand ${round.maxDemand.toFixed(2)} NEAR</small><a class="proof-link" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">Inspect coordinator state -&gt;</a></div><div class="savings-chip"><span>BUYER SAVINGS</span><b>${savings.toFixed(2)} NEAR</b></div></div>`;
+  const clearing = round.winner ? round.winner.price.toFixed(3) : '—';
+  const maxPrice = round.maxBuyerPrice ? round.maxBuyerPrice.toFixed(3) : '—';
+  return `<div class="market-economics"><div><span class="panel-kicker">LIVE MARKET ECONOMICS</span><strong class="market-headline">Buyers paid ${clearing} instead of ${maxPrice} NEAR</strong><small>${round.demands?.length || 0} buyer intents · ${round.allocatedUnits || 0} units allocated · cheapest-first clearing</small><a class="proof-link" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">Inspect coordinator state -&gt;</a></div><div class="savings-chip"><span>BUYER SAVINGS</span><b>${savings.toFixed(2)} NEAR saved</b></div></div>`;
 }
 
 function renderSwarmSimulation() {

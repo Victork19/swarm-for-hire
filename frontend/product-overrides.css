@@ -103,8 +103,10 @@
 .market-economics { display: flex; justify-content: space-between; gap: 18px; margin: -8px 0 24px; padding: 15px 16px; border: 1px solid var(--orange); background: #fffaf5; }
 .market-economics > div:first-child { display: grid; gap: 5px; }
 .market-economics strong { font: 600 14px var(--sans); }
+.market-economics .market-headline { font: 600 clamp(20px, 2.8vw, 34px) var(--sans); letter-spacing: -.045em; }
 .market-economics small { color: var(--muted); font: 10px/1.5 var(--mono); }
 .savings-chip { display: grid; gap: 5px; align-content: center; min-width: 130px; padding-left: 18px; border-left: 1px solid var(--line); }
+.savings-chip b { color: var(--orange); font: 600 clamp(22px, 3vw, 38px) var(--mono); white-space: nowrap; }
 .savings-chip span { color: var(--orange); font: 9px var(--mono); letter-spacing: .1em; }
 .savings-chip b { font: 600 16px var(--mono); }
 @media (max-width: 640px) { .market-economics { align-items: flex-start; flex-direction: column; } .savings-chip { padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--line); width: 100%; } }
