@@ -310,6 +310,6 @@ function registerWalletEvents() {
   });
 }
 el('wallet-btn')?.addEventListener('click', () => connectWallet().catch((error) => toast(`Wallet connection failed: ${error.message}`)));
-el('refresh-btn')?.addEventListener('click', () => refreshLive().then(() => toast('Market refreshed')).catch(() => {}));
+el('refresh-btn')?.addEventListener('click', () => { if (simulation && liveSwarm) { runSwarmSimulation().then(() => toast('Live market refreshed')).catch(() => {}); } else { refreshLive().then(() => toast('Bounty market refreshed')).catch(() => {}); } });
 el('showcase-btn')?.addEventListener('click', () => { if (simulation) { location.href = 'dashboard.html'; } else { location.href = 'swarm.html'; } });
 if (simulation) { el('create-btn')?.addEventListener('click', () => { if (liveSwarm) { runSwarmSimulation(); } else { swarmState.round = Math.min(5, swarmState.round + 1); renderSwarmSimulation(); } }); runSwarmSimulation(); } else if (detailRoute) { el('create-btn')?.addEventListener('click', () => { location.href = 'dashboard.html'; }); el('create-btn').innerHTML = 'Back to dashboard <span>-&gt;</span>'; refreshLive(); } else { el('create-btn')?.addEventListener('click', createLive); renderList(); refreshLive(); window.setInterval(() => { if (!state.loading) refreshLive(); }, 15000); }
