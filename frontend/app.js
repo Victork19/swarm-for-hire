@@ -7,7 +7,7 @@ const AGENT2 = 'agent2.swarmbuilder.testnet';
 const params = new URLSearchParams(location.search);
 const detailRoute = /\/bounty(?:\.html)?\/?$/.test(location.pathname);
 const simulation = /\/swarm(?:\.html)?\/?$/.test(location.pathname) || params.get('mode') === 'swarm';
-const liveSwarm = simulation && params.get('live') === '1';
+const liveSwarm = simulation && params.get('mode') !== 'simulation' && params.get('live') !== '0';
 const requestedBounty = Number(params.get('id'));
 // This app is deployed against the testnet contract. Requiring testnet here
 // prevents a mainnet wallet session from being selected accidentally.
@@ -300,6 +300,7 @@ function polishSettledMarketView() {
   }
   document.querySelector('.swarm-workspace .refresh-btn')?.setAttribute('hidden', '');
   document.querySelector('.swarm-workspace + .page-footer-actions #create-btn')?.setAttribute('hidden', '');
+  detail.querySelector('.live-market-footer a[href="swarm.html"]')?.setAttribute('href', 'swarm.html?mode=simulation');
 }
 
 function renderSwarmSimulation() {
