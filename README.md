@@ -157,7 +157,7 @@ The coordinator’s native NEAR path is the verified testnet fallback. The separ
 
 ### NEAR Intents adapter
 
-`intents/settle.py` is an opt-in backend adapter for the NEAR Intents Agent API. The Docker service exposes it at `POST /v1/intents/settle`. It requires `NEAR_INTENTS_API_KEY`, `NEAR_INTENTS_GRANT_TOKEN`, `NEAR_INTENTS_AGENT_ID`, and an explicit idempotency key; it never falls back to native NEAR or exposes credentials to the browser. Run it only after configuring a funded Intents agent and a supported route. Testnet bounty payouts remain native NEAR until a funded Intents agent and route are available.
+`intents/settle.py` is an opt-in backend adapter for the NEAR Intents 1Click API. The Docker service exposes it at `POST /v1/intents/settle`. It requests a dry quote by default; a committed quote returns a deposit address and must be funded and polled before it is considered settled. It requires an API key and explicit idempotency key, never exposes credentials to the browser, and never replaces the reliable native NEAR testnet payout path.
 
 ### EC2 worker deployment
 
