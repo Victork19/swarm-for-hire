@@ -282,8 +282,28 @@ function renderLiveCoordinatorRound(round) {
   el('detail').innerHTML = `<div class="live-market-hero"><div><div class="detail-kicker">LIVE MARKET · ROUND 01 · SETTLED ON TESTNET</div><h2>Clearing price ${clearing} NEAR.</h2><p>Five buyers locked a 0.05 NEAR maximum. Five sealed worker bids were revealed and cleared cheapest-first at ${clearing} NEAR. All five allocations were paid on-chain.</p><div class="live-market-actions"><a class="primary" href="https://testnet.nearblocks.io/txns/${SETTLEMENT_TX}" target="_blank" rel="noreferrer">View settlement transaction <span>-&gt;</span></a><span class="status-tag settled">ALLOCATED</span></div></div><div class="live-savings-hero"><span>BUYERS SAVED</span><strong>${savings} <small>NEAR</small></strong><em>24% below the 0.05 NEAR max</em></div></div><div class="live-market-proof"><div><span>BUYERS</span><strong>${round?.demands?.length || 5}</strong><small>pooled demand</small></div><div><span>WORKERS</span><strong>${bids.length || 5}</strong><small>sealed bids</small></div><div><span>CLEARING</span><strong>${clearing}<small> NEAR</small></strong><small>cheapest-first rule</small></div><div><span>ALLOCATION</span><strong>${allocated}/${bids.length || 5}</strong><small>payments recorded</small></div></div><div class="live-round-flow"><span class="done">01 Demand pooled</span><span class="done">02 Bids sealed</span><span class="done">03 Bids revealed</span><span class="done">04 Cleared and allocated</span></div><div class="workspace-section-heading"><div><span class="panel-kicker">ALLOCATION RECORD</span><h3>Five worker payments</h3></div><p>One completed round · inspect the settlement proof</p></div><div class="table-wrap live-bids-table"><table class="agent-table simulation-table"><thead><tr><th>WORKER</th><th>COMMITMENT</th><th>QUALITY</th><th>PRICE</th><th>STATUS</th></tr></thead><tbody>${bids.map((bid) => `<tr><td><span class="agent-account">${escapeHtml(bid.seller)}</span><small>allocated unit</small></td><td><code class="hash">revealed on-chain</code></td><td>${escapeHtml(bid.quality)}</td><td>0.038 NEAR</td><td><span class="bid-state winner">ALLOCATED</span></td></tr>`).join('')}</tbody></table></div><div class="live-market-footer"><span><i class="evidence-dot verified"></i>Settlement recorded on NEAR testnet</span><span><a class="proof-link" href="https://testnet.nearblocks.io/txns/${SETTLEMENT_TX}" target="_blank" rel="noreferrer">View transaction -&gt;</a> <a class="proof-link" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">View coordinator -&gt;</a> <a class="proof-link" href="swarm.html" rel="noreferrer">Run deterministic simulation -&gt;</a></span></div>`;
 }
 
+function polishSettledMarketView() {
+  const detail = el('detail');
+  const hero = detail?.querySelector('.live-market-hero');
+  const savings = detail?.querySelector('.live-savings-hero');
+  if (!detail || !hero || !savings) return;
+  hero.classList.add('settled-market-hero');
+  const copy = hero.firstElementChild;
+  if (copy && savings.parentElement !== copy) copy.prepend(savings);
+  detail.querySelector('.live-round-flow')?.remove();
+  const brief = copy?.querySelector('p');
+  if (brief && !brief.nextElementSibling?.classList.contains('settlement-line')) {
+    const line = document.createElement('p');
+    line.className = 'settlement-line';
+    line.innerHTML = `Settlement tx: <a href="https://testnet.nearblocks.io/txns/${SETTLEMENT_TX}" target="_blank" rel="noreferrer">${SETTLEMENT_TX}</a>`;
+    brief.after(line);
+  }
+  document.querySelector('.swarm-workspace .refresh-btn')?.setAttribute('hidden', '');
+  document.querySelector('.swarm-workspace + .page-footer-actions #create-btn')?.setAttribute('hidden', '');
+}
+
 function renderSwarmSimulation() {
-  if (liveSwarm) { renderLiveCoordinatorRound(swarmState.rounds[swarmState.round - 1] || recordedCoordinatorRound); return; }
+  if (liveSwarm) { renderLiveCoordinatorRound(swarmState.rounds[swarmState.round - 1] || recordedCoordinatorRound); polishSettledMarketView(); return; }
   const round = swarmState.rounds[swarmState.round - 1];
   const phase = liveSwarm && round?.phase ? round.phase : swarmState.round === 0 ? 'Waiting to open round' : swarmState.round < 3 ? 'Commitments sealed' : swarmState.round === 3 ? 'Bids revealed' : 'Allocation cleared';
   const buyerCount = liveSwarm ? (round?.demands?.length || 0) : 20;
