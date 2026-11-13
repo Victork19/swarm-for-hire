@@ -266,7 +266,23 @@ function marketEconomics(round) {
   return `<div class="market-economics"><div><span class="panel-kicker">LIVE MARKET ECONOMICS</span><strong class="market-headline">Buyers paid ${clearing} instead of ${maxPrice} NEAR</strong><small>${round.demands?.length || 0} buyer intents · ${round.allocatedUnits || 0} units allocated · cheapest-first clearing</small><a class="proof-link" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">Inspect coordinator state -&gt;</a></div><div class="savings-chip"><span>BUYER SAVINGS</span><b>${savings.toFixed(2)} NEAR saved</b></div></div>`;
 }
 
+function renderLiveCoordinatorRound(round) {
+  const clearing = round?.winner ? round.winner.price.toFixed(3) : '—';
+  const maxPrice = round?.maxBuyerPrice ? round.maxBuyerPrice.toFixed(3) : '—';
+  const savings = Number(round?.savings || 0).toFixed(2);
+  const bids = round?.bids || [];
+  const allocated = round?.allocatedUnits || bids.filter((bid) => bid.allocated).length;
+  el('mode-label').textContent = 'LIVE COORDINATOR';
+  el('product-status').textContent = 'Completed coordinator round from swarm-market.swarmbuilder.testnet.';
+  el('create-btn').textContent = 'Refresh live state';
+  el('refresh-btn').disabled = false;
+  el('refresh-btn').textContent = 'Refresh chain';
+  el('bounty-list').innerHTML = `<div class="live-market-list-label">COMPLETED TESTNET ROUND</div><div class="live-round-item"><span><b>${escapeHtml(round?.id || 'ROUND-01')}</b><small>allocation recorded</small></span><strong>${clearing} NEAR</strong></div>`;
+  el('detail').innerHTML = `<div class="live-market-hero"><div><div class="detail-kicker">LIVE COORDINATOR / COMPLETED ROUND</div><h2>Buyers paid ${clearing} instead of ${maxPrice} NEAR.</h2><p>Five sealed bids were revealed, cleared cheapest-first, and allocated across ${allocated} worker units.</p><div class="live-market-actions"><a class="primary" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">Inspect coordinator <span>-&gt;</span></a><span class="status-tag settled">ALLOCATED</span></div></div><div class="live-savings-hero"><span>BUYER SAVINGS</span><strong>${savings} <small>NEAR</small></strong><em>aggregate surplus</em></div></div><div class="live-market-proof"><div><span>BUYERS</span><strong>${round?.demands?.length || 5}</strong><small>pooled intents</small></div><div><span>WORKERS</span><strong>${bids.length || 5}</strong><small>sealed bids</small></div><div><span>CLEARING</span><strong>${clearing}<small> NEAR</small></strong><small>deterministic price</small></div><div><span>ALLOCATION</span><strong>${allocated}/${bids.length || 5}</strong><small>units recorded</small></div></div><div class="live-round-flow"><span class="done">01 Demand pooled</span><span class="done">02 Bids sealed</span><span class="done">03 Bids revealed</span><span class="done">04 Cleared and allocated</span></div><div class="workspace-section-heading"><div><span class="panel-kicker">ALLOCATION RECORD</span><h3>Worker bids</h3></div><p>One completed round · no wallet required to inspect</p></div><div class="table-wrap live-bids-table"><table class="agent-table simulation-table"><thead><tr><th>WORKER</th><th>COMMITMENT</th><th>QUALITY</th><th>PRICE</th><th>STATUS</th></tr></thead><tbody>${bids.map((bid) => `<tr><td><span class="agent-account">${escapeHtml(bid.seller)}</span><small>allocated unit</small></td><td><code class="hash">${escapeHtml(shortHash(bid.commitment))}</code></td><td>${escapeHtml(bid.quality)}</td><td>${Number(bid.price).toFixed(3)} NEAR</td><td><span class="bid-state winner">ALLOCATED</span></td></tr>`).join('')}</tbody></table></div><div class="live-market-footer"><span><i class="evidence-dot verified"></i>Round state readable from the coordinator contract</span><a class="proof-link" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">View contract state -&gt;</a></div>`;
+}
+
 function renderSwarmSimulation() {
+  if (liveSwarm) { renderLiveCoordinatorRound(swarmState.rounds[swarmState.round - 1] || recordedCoordinatorRound); return; }
   const round = swarmState.rounds[swarmState.round - 1];
   const phase = liveSwarm && round?.phase ? round.phase : swarmState.round === 0 ? 'Waiting to open round' : swarmState.round < 3 ? 'Commitments sealed' : swarmState.round === 3 ? 'Bids revealed' : 'Allocation cleared';
   const buyerCount = liveSwarm ? (round?.demands?.length || 0) : 20;
