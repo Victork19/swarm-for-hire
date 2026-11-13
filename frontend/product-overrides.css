@@ -258,6 +258,7 @@
 .landing-hero .hero-actions .text-btn { font-size: 0; }
 .landing-hero .hero-actions .text-btn::before { content: 'Bounty workspace (earlier flow)'; font: 10px var(--mono); }
 .landing-hero .hero-actions .text-btn { margin-left: 18px; }
+.landing-hero .hero-actions .text-btn { display: none !important; }
 .landing-proof, .landing-live-proof, .landing-footer { display: none; }
 .landing-hero .landing-cta { font-size: 0; }
 .landing-hero .landing-cta::before { content: 'View live market round'; font: 600 12px var(--mono); }
