@@ -233,7 +233,7 @@
 .landing-steps h3 { margin: 28px 0 10px; font-size: 20px; }
 .landing-footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px clamp(20px, 8vw, 124px) 42px; border-top: 1px solid var(--line); }
 .landing-footer p { color: var(--muted); font: 10px var(--mono); letter-spacing: .08em; }
-.landing-hero { position: relative; min-height: min(720px, calc(100vh - 76px)); display: flex; flex-direction: column; justify-content: center; overflow: hidden; background: linear-gradient(90deg, transparent 0, transparent calc(100% - 1px), var(--line) calc(100% - 1px)); }
+.landing-hero { position: relative; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; padding-top: clamp(42px, 6vw, 78px); padding-bottom: clamp(68px, 8vw, 108px); overflow: hidden; background: linear-gradient(90deg, transparent 0, transparent calc(100% - 1px), var(--line) calc(100% - 1px)); }
 .landing-hero::after { position: absolute; right: 8%; bottom: 12%; width: 120px; height: 120px; border: 1px solid #ff5b2d66; border-radius: 50%; content: ''; pointer-events: none; }
 .landing-hero-grid { position: relative; z-index: 1; grid-template-columns: minmax(0, 1.15fr) minmax(290px, .55fr); gap: clamp(44px, 9vw, 150px); align-items: center; }
 .landing-hero h1 { max-width: 830px; font-size: clamp(58px, 8.3vw, 124px); line-height: .84; }
@@ -246,7 +246,7 @@
 .landing-note strong { max-width: 260px; margin: 0 0 18px; font-size: clamp(25px, 2.5vw, 36px); line-height: .98; letter-spacing: -.055em; }
 .landing-note p { max-width: 285px; font-size: 12px; }
 .landing-note::after { display: block; margin-top: 32px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); content: 'ATTESTED / DETERMINISTIC / ON-CHAIN'; font: 9px var(--mono); letter-spacing: .07em; }
-.landing-hero .eyebrow { position: relative; z-index: 2; margin-bottom: clamp(30px, 5vw, 66px); }
+.landing-hero .eyebrow { position: relative; z-index: 2; margin-bottom: clamp(26px, 4vw, 48px); }
 .landing-hero-copy { position: relative; }
 .landing-kicker { display: flex; align-items: center; gap: 9px; color: #236d55; font: 10px var(--mono); letter-spacing: .12em; margin-bottom: 20px; }
 .live-pulse { width: 7px; height: 7px; border-radius: 50%; background: #26a269; box-shadow: 0 0 0 5px #26a26922; }
