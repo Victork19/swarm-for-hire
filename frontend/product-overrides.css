@@ -363,6 +363,8 @@
 .swarm-workspace { grid-template-columns: 1fr; }
 .swarm-workspace .rail { display: none; }
 .swarm-workspace .detail { grid-column: 1 / -1; }
+.swarm-workspace .workspace-section-heading { display: none; }
+.landing-page .landing-live-proof, .landing-page .landing-proof, .landing-page .landing-footer, .landing-page .landing-hero-preview, .landing-page .landing-note { display: none !important; }
 .live-market-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; color: var(--muted); font: 10px var(--mono); }
 .live-market-footer span { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 800px) {
