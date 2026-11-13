@@ -375,6 +375,10 @@
 .swarm-workspace .workspace-section-heading { display: none; }
 .swarm-workspace .refresh-btn, .swarm-workspace .live-round-flow, .swarm-workspace + .page-footer-actions #create-btn { display: none !important; }
 .landing-page .landing-live-proof, .landing-page .landing-proof, .landing-page .landing-footer, .landing-page .landing-hero-preview, .landing-page .landing-note { display: none !important; }
+.bounty-command > div, .agent-card, .agent-card-head > div, .agent-card-proof > div, .intent-panel, .settlement-strip > div { min-width: 0; }
+.bounty-command h2, .intent-panel strong, .intent-panel small, .settlement-strip small, .agent-account, .command-meta-text { overflow-wrap: anywhere; word-break: break-word; }
+.agent-card-metrics strong, .evidence-label { min-width: 0; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.agent-card-proof code { white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.35; }
 .live-market-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; color: var(--muted); font: 10px var(--mono); }
 .live-market-footer span { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 800px) {
