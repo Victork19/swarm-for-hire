@@ -5,6 +5,7 @@ COPY worker/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 COPY worker /app/worker
 COPY backend /app/backend
+COPY intents /app/intents
 
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
