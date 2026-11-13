@@ -307,6 +307,8 @@
 .back-link:hover { color: var(--orange); }
 .page-context { color: var(--ink); }
 .bounty-workspace, .swarm-workspace { margin: 0; }
+.bounty-workspace { grid-template-columns: 1fr; }
+.bounty-workspace .standalone-detail { grid-column: 1 / -1; width: 100%; min-width: 0; }
 .standalone-detail { min-height: 560px; }
 .toolbar-actions { display: flex; align-items: center; gap: 22px; }
 .page-footer-actions { display: flex; align-items: center; gap: 22px; padding-top: 20px; }
