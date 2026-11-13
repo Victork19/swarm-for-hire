@@ -253,6 +253,7 @@
 .landing-outcome small { color: var(--muted); font: 10px var(--mono); letter-spacing: 0; }
 .landing-hero h1 { display: none; }
 .landing-hero .hero-actions { margin-top: 0; }
+.landing-hero .hero-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
 .landing-hero .landing-cta::before { content: 'View the settled round'; }
 .landing-hero .hero-actions .text-btn { font-size: 0; }
 .landing-hero .hero-actions .text-btn::before { content: 'Bounty workspace (earlier flow)'; font: 10px var(--mono); }
@@ -364,6 +365,7 @@
 .swarm-workspace .rail { display: none; }
 .swarm-workspace .detail { grid-column: 1 / -1; }
 .swarm-workspace .workspace-section-heading { display: none; }
+.swarm-workspace .refresh-btn, .swarm-workspace .live-round-flow, .swarm-workspace + .page-footer-actions #create-btn { display: none !important; }
 .landing-page .landing-live-proof, .landing-page .landing-proof, .landing-page .landing-footer, .landing-page .landing-hero-preview, .landing-page .landing-note { display: none !important; }
 .live-market-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; color: var(--muted); font: 10px var(--mono); }
 .live-market-footer span { display: flex; align-items: center; gap: 8px; }

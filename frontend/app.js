@@ -314,6 +314,7 @@ function polishSettledMarketView() {
   resultLine.textContent = `${clearingText} · ${allocated} allocations paid · 0.06 NEAR total surplus`;
   copy?.querySelector('.settlement-line')?.before(resultLine);
   detail.querySelector('.live-round-flow')?.remove();
+  detail.querySelector('.simulation-flow')?.remove();
   const brief = copy?.querySelector('p');
   if (brief && !brief.nextElementSibling?.classList.contains('settlement-line')) {
     const line = document.createElement('p');
