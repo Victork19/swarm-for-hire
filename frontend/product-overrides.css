@@ -262,14 +262,14 @@
 .landing-hero h1 { display: none; }
 .landing-hero .hero-actions { margin-top: 0; }
 .landing-hero .hero-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
-.landing-hero .landing-cta::before { content: 'View the settled round'; }
+.landing-hero .landing-cta::before { content: 'Open live market'; }
 .landing-hero .hero-actions .text-btn { font-size: 0; }
 .landing-hero .hero-actions .text-btn::before { content: 'Bounty workspace (earlier flow)'; font: 10px var(--mono); }
 .landing-hero .hero-actions .text-btn { margin-left: 18px; }
 .landing-hero .hero-actions .text-btn { display: none !important; }
 .landing-proof, .landing-live-proof, .landing-footer { display: none; }
 .landing-hero .landing-cta { font-size: 0; }
-.landing-hero .landing-cta::before { content: 'View live market round'; font: 600 12px var(--mono); }
+.landing-hero .landing-cta::before { content: 'Open live market'; font: 600 12px var(--mono); }
 .landing-hero .landing-cta span { display: none; }
 .landing-hero .landing-cta::after { content: '->'; margin-left: 20px; font: 400 12px var(--mono); }
 .landing-hero::after { display: none; }
@@ -294,6 +294,13 @@
 .landing-proof { display: none; }
 .landing-hero h1 { max-width: 830px; font-size: clamp(58px, 8.3vw, 124px); line-height: .84; }
 .landing-hero h1 span { display: inline-block; margin-left: clamp(18px, 4vw, 74px); color: var(--orange); }
+
+/* Final landing hierarchy: one result, one primary action, one quiet secondary link. */
+.landing-hero h1.landing-outcome { display: block; grid-column: 1; grid-row: auto; }
+.landing-hero-grid { grid-template-columns: minmax(0, 1fr); }
+.landing-hero .hero-actions { grid-column: 1; grid-row: auto; }
+.landing-hero .hero-actions .text-btn { display: block !important; font-size: 0; }
+.landing-hero .hero-actions .text-btn::before { content: 'Earlier bounty flow'; font: 10px var(--mono); }
 .landing-lede { max-width: 475px; font-size: 17px; }
 .landing-hero .hero-actions { align-items: center; flex-wrap: wrap; }
 .landing-note { position: relative; max-width: 335px; padding: 24px 0 24px 25px; border-left: 2px solid var(--orange); }
@@ -360,6 +367,9 @@
 .settled-market-hero .surplus-line { margin: 12px 0 0; color: var(--ink); font: 11px var(--mono); }
 .browser-verification-panel, .intents-dry-run { margin: 24px 0; padding: 16px 18px; border: 1px solid var(--line); background: #f5f1e9; }
 .browser-verification-panel strong, .intents-dry-run strong { display: block; margin: 5px 0; font: 600 13px var(--sans); }
+.browser-verification-panel .verification-status.verified { color: #236d55; }
+.browser-verification-panel .verification-status.mismatch { color: #a33c20; }
+.live-subhero { margin: 0 0 16px !important; color: var(--ink) !important; font: 600 clamp(18px, 2.4vw, 28px)/1.1 var(--sans) !important; letter-spacing: -.04em; }
 .browser-verification-panel small, .intents-dry-run small { display: block; max-width: 760px; color: var(--muted); font: 10px/1.5 var(--mono); }
 .intents-payload { display: block; margin-top: 10px; color: var(--ink); font: 10px var(--mono); white-space: normal; }
 .rejected-worker { background: #fff4ef; }

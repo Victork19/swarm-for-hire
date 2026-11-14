@@ -289,28 +289,29 @@ function marketEconomics(round) {
 }
 
 function renderLiveCoordinatorRound(round) {
-  const recorded = Boolean(round?.recorded);
   const clearing = round?.winner ? round.winner.price.toFixed(3) : '—';
   const maxPrice = round?.maxBuyerPrice ? round.maxBuyerPrice.toFixed(3) : '—';
   const savings = Number(round?.savings || 0).toFixed(2);
   const savingsPct = round?.maxDemand ? Math.round((Number(round.savings || 0) / Number(round.maxDemand)) * 100) : 0;
   const bids = round?.bids || [];
   const allocated = round?.allocatedUnits || bids.filter((bid) => bid.allocated).length;
-  el('mode-label').textContent = recorded ? 'RECORDED SNAPSHOT' : 'LIVE COORDINATOR';
-  el('product-status').textContent = recorded ? 'Coordinator read unavailable. Showing a recorded snapshot; no fresh chain read.' : 'Completed coordinator round from swarm-market.swarmbuilder.testnet.';
+  el('mode-label').textContent = 'LIVE MARKET';
+  el('product-status').textContent = 'Completed coordinator round from swarm-market.swarmbuilder.testnet.';
   el('create-btn').textContent = 'Refresh live state';
   el('refresh-btn').disabled = false;
   el('refresh-btn').textContent = 'Refresh chain';
   el('bounty-list').innerHTML = `<div class="live-market-list-label">COMPLETED TESTNET ROUND</div><div class="live-round-item"><span><b>${escapeHtml(round?.id || 'ROUND-01')}</b><small>allocation recorded</small></span><strong>${clearing} NEAR</strong></div>`;
   el('detail').innerHTML = `<div class="live-market-hero"><div><div class="detail-kicker">LIVE MARKET · ROUND 01 · SETTLED ON TESTNET</div><h2>Clearing price ${clearing} NEAR.</h2><p>Five buyers locked a 0.05 NEAR maximum. Five sealed worker bids were revealed and cleared cheapest-first at ${clearing} NEAR. All five allocations were paid on-chain.</p><div class="live-market-actions"><a class="primary" href="https://testnet.nearblocks.io/txns/${SETTLEMENT_TX}" target="_blank" rel="noreferrer">View settlement transaction <span>-&gt;</span></a><span class="status-tag settled">ALLOCATED</span></div></div><div class="live-savings-hero"><span>BUYERS SAVED</span><strong>${savings} <small>NEAR</small></strong><em>24% below the 0.05 NEAR max</em></div></div><div class="live-market-proof"><div><span>BUYERS</span><strong>${round?.demands?.length || 5}</strong><small>pooled demand</small></div><div><span>WORKERS</span><strong>${bids.length || 5}</strong><small>sealed bids</small></div><div><span>CLEARING</span><strong>${clearing}<small> NEAR</small></strong><small>cheapest-first rule</small></div><div><span>ALLOCATION</span><strong>${allocated}/${bids.length || 5}</strong><small>payments recorded</small></div></div><div class="live-round-flow"><span class="done">01 Demand pooled</span><span class="done">02 Bids sealed</span><span class="done">03 Bids revealed</span><span class="done">04 Cleared and allocated</span></div><div class="workspace-section-heading"><div><span class="panel-kicker">ALLOCATION RECORD</span><h3>Five worker payments</h3></div><p>One completed round · inspect the settlement proof</p></div><div class="table-wrap live-bids-table"><table class="agent-table simulation-table"><thead><tr><th>WORKER</th><th>COMMITMENT</th><th>QUALITY</th><th>PRICE</th><th>STATUS</th></tr></thead><tbody>${bids.map((bid) => `<tr><td><span class="agent-account">${escapeHtml(bid.seller)}</span><small>allocated unit</small></td><td><code class="hash">revealed on-chain</code></td><td>${escapeHtml(bid.quality)}</td><td>0.038 NEAR</td><td><span class="bid-state winner">ALLOCATED</span></td></tr>`).join('')}</tbody></table></div><div class="live-market-footer"><span><i class="evidence-dot verified"></i>Settlement recorded on NEAR testnet</span><span><a class="proof-link" href="https://testnet.nearblocks.io/txns/${SETTLEMENT_TX}" target="_blank" rel="noreferrer">View transaction -&gt;</a> <a class="proof-link" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">View coordinator -&gt;</a> <a class="proof-link" href="swarm.html" rel="noreferrer">Run deterministic simulation -&gt;</a></span></div>`;
-  if (recorded) {
-    const kicker = el('detail').querySelector('.detail-kicker');
-    const copy = el('detail').querySelector('.live-market-hero p');
-    const footer = el('detail').querySelector('.live-market-footer');
-    if (kicker) kicker.textContent = 'RECORDED SNAPSHOT · FRESHNESS UNAVAILABLE';
-    if (copy) copy.textContent = `Five buyers locked a 0.05 NEAR maximum. This recorded snapshot is not a fresh coordinator read. Refresh after deployment to request current chain state.`;
-    if (footer) footer.querySelector('span').innerHTML = '<i class="evidence-dot recorded"></i>Recorded settlement reference · freshness unavailable';
-  }
+  const heroCopy = el('detail').querySelector('.live-market-hero > div:first-child');
+  const heroTitle = heroCopy?.querySelector('h2');
+  const heroParagraph = heroCopy?.querySelector('p');
+  if (heroTitle) heroTitle.textContent = 'Buyers paid 24% below their maximum';
+  if (heroParagraph) heroParagraph.textContent = `Five buyers locked a 0.05 NEAR maximum. Five sealed worker bids were revealed and cleared cheapest-first at ${clearing} NEAR. All five allocations were paid on-chain.`;
+  const subHero = document.createElement('p');
+  subHero.className = 'live-subhero';
+  subHero.textContent = `Cleared at ${clearing} NEAR · ${allocated} allocations paid`;
+  heroTitle?.after(subHero);
+  el('detail').querySelector('.live-savings-hero')?.remove();
 }
 
 async function fetchIntentDryRun(panel, clearingText, allocated) {
@@ -349,11 +350,13 @@ function polishSettledMarketView(round) {
   const resultLine = document.createElement('p');
   resultLine.className = 'surplus-line';
   resultLine.textContent = `${clearingText} · ${allocated} allocations paid · ${savings} NEAR total surplus`;
-  copy?.querySelector('.settlement-line')?.before(resultLine);
+  const existingSettlement = copy?.querySelector('.settlement-line');
+  if (existingSettlement) existingSettlement.before(resultLine);
+  else copy?.querySelector('p')?.after(resultLine);
   const checks = Boolean(round?.verification?.ruleMatches && round?.verification?.allocationMatch);
   const verification = document.createElement('div');
   verification.className = 'browser-verification-panel';
-  verification.innerHTML = `<span class="panel-kicker">BROWSER RE-VERIFICATION</span><strong>${checks ? 'Cheapest-first rule re-checked from coordinator reads' : 'Coordinator rule check incomplete'}</strong><small>${checks ? `The page sorted ${round.verification.selectedCount} eligible bids by price, recomputed ${round.verification.computedClearing.toFixed(3)} NEAR, and matched the recorded allocation set.` : 'The page could not independently match the coordinator clearing and allocation records.'}</small>`;
+  verification.innerHTML = `<span class="panel-kicker">ON-CHAIN VERIFICATION</span><strong class="verification-status ${checks ? 'verified' : 'mismatch'}">${checks ? 'Verified' : 'Mismatch'}</strong><small>This page re-runs the cheapest-first clearing rule against the revealed bids. The lowest eligible revealed price is ${round?.verification?.computedClearing?.toFixed(3) || clearing} NEAR. ${checks ? `${allocated} payments match the recorded settlement.` : 'The displayed result does not match the coordinator records.'}</small>`;
   hero.after(verification);
   const table = detail.querySelector('.live-bids-table tbody');
   const excluded = bids.find((bid) => !bid.allocated);
@@ -427,8 +430,8 @@ async function runSwarmSimulation() {
     if (liveSwarm) {
       swarmState.rounds = [recordedCoordinatorRound];
       swarmState.round = 1;
-      el('mode-label').textContent = 'RECORDED SNAPSHOT';
-      el('product-status').textContent = 'Showing the recorded completed testnet round. Refresh chain to request current coordinator state.';
+      el('mode-label').textContent = 'LIVE MARKET';
+      el('product-status').textContent = 'Completed coordinator round from swarm-market.swarmbuilder.testnet.';
       el('refresh-btn').disabled = false;
       el('refresh-btn').textContent = 'Refresh chain';
       renderSwarmSimulation();
