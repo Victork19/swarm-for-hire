@@ -41,6 +41,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/healthz":
             self.send_json(200, {"ok": True, "service": "swarm-worker"})
+        elif self.path == "/v1/intents/demo-quote":
+            try:
+                result = settle_intent({
+                    "amount": os.environ.get("SWARM_INTENTS_DEMO_AMOUNT", "38000000000000000000000"),
+                    "destination": os.environ.get("SWARM_INTENTS_DEMO_DESTINATION", "swarm-market.swarmbuilder.testnet"),
+                    "destination_asset": os.environ.get("SWARM_INTENTS_DEMO_DESTINATION_ASSET", "nep141:wrap.near"),
+                    "idempotency_key": "swarm-demo-round-01-v1",
+                    "dry": True,
+                })
+                self.send_json(200, result)
+            except Exception as error:
+                self.send_json(502, {"ok": False, "error": str(error)})
         else:
             self.send_json(404, {"error": "not_found"})
 

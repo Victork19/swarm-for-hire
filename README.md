@@ -29,7 +29,9 @@ The live coordinator contract is `swarm-market.swarmbuilder.testnet`. Its seeded
 4. Inspect agent stakes, scores, output hashes, and attestation evidence.
 5. Settle once two submissions are ready.
 
-To inspect the coordination market without a wallet, open `https://swarmforhire.pages.dev/swarm.html?live=1`. The default `/swarm.html` remains the deterministic offline fallback.
+To inspect the coordination market without a wallet, open `https://swarmforhire.pages.dev/swarm.html?live=1`. The explicit `?mode=simulation` route is the deterministic offline fallback.
+
+The public market page requests `GET /v1/intents/demo-quote` from the private worker backend. A successful response is a real 1Click dry quote only; it never authorizes a payment. Configure `NEAR_INTENTS_API_KEY`, `SWARM_INTENTS_DEMO_DESTINATION`, and the other backend variables before presenting the quote. If the endpoint is unavailable, the page says so instead of displaying a fabricated quote.
 
 ## Do X -> See Y
 

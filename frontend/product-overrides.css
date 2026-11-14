@@ -148,8 +148,16 @@
   .agent-table th:nth-child(4), .agent-table td:nth-child(4), .agent-table th:nth-child(5), .agent-table td:nth-child(5) { display: none; }
 }
 
+@media (max-width: 800px) {
+  .live-bids-table { overflow-x: auto; }
+  .live-bids-table .agent-table { min-width: 620px; }
+  .live-bids-table .agent-table th:nth-child(4), .live-bids-table .agent-table td:nth-child(4),
+  .live-bids-table .agent-table th:nth-child(5), .live-bids-table .agent-table td:nth-child(5) { display: table-cell; }
+}
+
 /* Bounty workspace: task-first evidence canvas */
 .bounty-workspace .standalone-detail { padding-top: clamp(26px, 4vw, 54px); }
+.workspace-intro h1 { font-size: 32px; letter-spacing: -.04em; margin: 8px 0 0; }
 .bounty-command { display: flex; justify-content: space-between; gap: 32px; border-bottom: 1px solid var(--ink); padding-bottom: 28px; }
 .bounty-command h2 { max-width: 760px; margin: 12px 0 18px; font-size: clamp(30px, 4vw, 56px); line-height: .98; letter-spacing: -.065em; }
 .command-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -357,6 +365,7 @@
 .rejected-worker { background: #fff4ef; }
 .rejected-worker .bid-state.rejected { color: #a33c20; border-color: #d79a84; }
 .rejection-reason { display: block; margin-top: 5px; color: #a33c20; font: 9px var(--mono); }
+.guardrail-note td { padding: 12px 0; color: var(--muted); font: 10px var(--mono); }
 .live-savings-hero small { font-size: 13px; letter-spacing: 0; }
 .live-savings-hero em { display: block; margin-top: 7px; color: var(--muted); font: 10px var(--mono); font-style: normal; }
 .live-market-proof { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--line); margin-bottom: 30px; }

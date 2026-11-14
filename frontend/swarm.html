@@ -27,6 +27,9 @@
     <div class="page-footer-actions"><button type="button" class="primary" id="create-btn">Refresh live state <span>-&gt;</span></button><button type="button" class="text-btn" id="showcase-btn">Back to dashboard <span>-&gt;</span></button><p class="microcopy" id="product-status">Live testnet round 1. Native NEAR payments completed; Intents adapter available through the private backend.</p></div>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261114-01"></script>
+  <script>
+    document.getElementById('detail')?.replaceChildren(Object.assign(document.createElement('div'), { className: 'detail-empty', innerHTML: '<span class="big-mark">*</span><h2>Loading the settled round.</h2><p>Reading the coordinator state from NEAR testnet…</p>' }));
+  </script>
+  <script type="module" src="app.js?v=20261114-02"></script>
 </body>
 </html>

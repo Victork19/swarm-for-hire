@@ -20,7 +20,7 @@ const bytesToHex = (value) => Array.isArray(value) ? `0x${value.map((byte) => Nu
 const shortHash = (value) => value ? `${value.slice(0, 10)}…${value.slice(-8)}` : '-';
 const demoAgents = [{ account: AGENT1, stake: 0.5, submitted: true, score: 90, attestation: 'demo-tee-quote-v2-a1b2c3d4' }, { account: AGENT2, stake: 0.5, submitted: true, score: 75, attestation: 'demo-tee-quote-v2-e5f6a7b8' }];
 const swarmState = { round: 0, rounds: [] };
-const recordedCoordinatorRound = { id: 'round-01', task: 'Confidential GPU inference', budget: 0.25, phase: 'Allocated', bids: [
+const recordedCoordinatorRound = { recorded: true, id: 'round-01', task: 'Confidential GPU inference', budget: 0.25, phase: 'Allocated', bids: [
   { seller: 'worker-01', commitment: 'recorded on-chain', quality: 82, price: 0.038, allocated: true },
   { seller: 'worker-02', commitment: 'recorded on-chain', quality: 86, price: 0.038, allocated: true },
   { seller: 'worker-03', commitment: 'recorded on-chain', quality: 88, price: 0.038, allocated: true },
@@ -244,7 +244,7 @@ async function buildSwarmSimulation() {
   return Promise.all(Array.from({ length: 5 }, async (_, index) => {
     const budget = Number((0.35 + index * 0.08).toFixed(2));
     const bids = await Promise.all(sellers.map((seller, sellerIndex) => ({ seller: seller.id, quality: Math.min(99, seller.quality + ((index * 5 + sellerIndex) % 7) - 3), price: Number((seller.basePrice + index * 0.01).toFixed(2)) })).filter((bid) => bid.price <= budget).map(async (bid) => ({ ...bid, commitment: await bidCommitment(`task-${index + 1}`, bid) })));
-    bids.sort((a, b) => b.quality - a.quality || a.price - b.price || a.seller.localeCompare(b.seller));
+    bids.sort((a, b) => a.price - b.price || b.quality - a.quality || a.seller.localeCompare(b.seller));
     return { id: `round-${String(index + 1).padStart(2, '0')}`, task: `Task ${index + 1}`, budget, bids, winner: bids[0] || null, runnerUp: bids[1] || null };
   }));
 }
@@ -257,17 +257,26 @@ async function loadCoordinatorSimulation() {
     const rawDemands = await coordinatorView('get_demands', { round_id: item.id });
     const rawAllocations = await coordinatorView('get_allocations', { round_id: item.id });
     const budget = Number(item.budget) / 1e24;
+    const maxBuyerPrice = rawDemands.length ? Math.max(...rawDemands.map((demand) => Number(demand.max_price) / 1e24)) : 0;
+    const totalQuantity = rawDemands.reduce((sum, demand) => sum + Number(demand.quantity), 0);
     const allocatedWorkers = new Set(rawAllocations.map((allocation) => allocation.worker));
-    const bids = rawBids.filter((bid) => bid.price !== null && Number(bid.price) / 1e24 <= budget).map((bid) => ({ seller: bid.worker, commitment: bytesToHex(bid.commitment), quality: bid.quality || 0, price: Number(bid.price) / 1e24, allocated: allocatedWorkers.has(bid.worker) }));
-    bids.sort((a, b) => b.quality - a.quality || a.price - b.price || a.seller.localeCompare(b.seller));
-    const maxDemand = rawDemands.reduce((sum, demand) => sum + Number(demand.max_price) / 1e24 * Number(demand.quantity), 0);
-    const maxBuyerPrice = rawDemands.length ? Number(rawDemands[0].max_price) / 1e24 : 0;
+    const bids = rawBids.filter((bid) => bid.price !== null).map((bid) => {
+      const price = Number(bid.price) / 1e24;
+      return { seller: bid.worker, commitment: bytesToHex(bid.commitment), quality: bid.quality || 0, price, eligible: price <= budget && price <= maxBuyerPrice, allocated: allocatedWorkers.has(bid.worker) };
+    });
+    const rankedEligible = bids.filter((bid) => bid.eligible).sort((a, b) => a.price - b.price || b.quality - a.quality || a.seller.localeCompare(b.seller));
+    const selected = rankedEligible.slice(0, totalQuantity);
+    const computedClearing = selected.length ? Math.max(...selected.map((bid) => bid.price)) : 0;
     const clearing = Number(item.clearing_price || 0) / 1e24;
     const allocatedUnits = rawAllocations.reduce((sum, allocation) => sum + Number(allocation.quantity), 0);
+    const selectedWorkers = new Set(selected.map((bid) => bid.seller));
+    const allocationMatch = selected.length === rawAllocations.length && rawAllocations.every((allocation) => selectedWorkers.has(allocation.worker) && Number(allocation.price) / 1e24 === clearing);
+    const ruleMatches = Math.abs(computedClearing - clearing) < 0.000000001 && selected.length === allocatedUnits && rawAllocations.every((allocation) => selectedWorkers.has(allocation.worker));
     const leadAllocation = rawAllocations[0];
-    const leadBid = bids.find((bid) => bid.seller === item.winner) || bids.find((bid) => bid.seller === leadAllocation?.worker) || bids[0] || null;
+    const leadBid = bids.find((bid) => bid.seller === item.winner) || bids.find((bid) => bid.seller === leadAllocation?.worker) || selected[0] || null;
     const winner = leadBid ? { ...leadBid, price: clearing || leadBid.price } : null;
-    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, phase: item.phase, bids, demands: rawDemands, allocations: rawAllocations, maxDemand, maxBuyerPrice, allocatedUnits, savings: Math.max(0, maxDemand - clearing * allocatedUnits), winner, runnerUp: bids[1] || null };
+    const maxDemand = rawDemands.reduce((sum, demand) => sum + Number(demand.max_price) / 1e24 * Number(demand.quantity), 0);
+    return { id: `round-${String(item.id + 1).padStart(2, '0')}`, task: item.task, budget, phase: item.phase, bids, demands: rawDemands, allocations: rawAllocations, maxDemand, maxBuyerPrice, allocatedUnits, savings: Math.max(0, maxDemand - clearing * allocatedUnits), winner, runnerUp: selected[1] || null, verification: { computedClearing, clearing, selectedCount: selected.length, allocationMatch, ruleMatches } };
   }));
 }
 
@@ -280,25 +289,53 @@ function marketEconomics(round) {
 }
 
 function renderLiveCoordinatorRound(round) {
+  const recorded = Boolean(round?.recorded);
   const clearing = round?.winner ? round.winner.price.toFixed(3) : '—';
   const maxPrice = round?.maxBuyerPrice ? round.maxBuyerPrice.toFixed(3) : '—';
   const savings = Number(round?.savings || 0).toFixed(2);
+  const savingsPct = round?.maxDemand ? Math.round((Number(round.savings || 0) / Number(round.maxDemand)) * 100) : 0;
   const bids = round?.bids || [];
   const allocated = round?.allocatedUnits || bids.filter((bid) => bid.allocated).length;
-  el('mode-label').textContent = 'LIVE COORDINATOR';
-  el('product-status').textContent = 'Completed coordinator round from swarm-market.swarmbuilder.testnet.';
+  el('mode-label').textContent = recorded ? 'RECORDED SNAPSHOT' : 'LIVE COORDINATOR';
+  el('product-status').textContent = recorded ? 'Coordinator read unavailable. Showing a recorded snapshot; no fresh chain read.' : 'Completed coordinator round from swarm-market.swarmbuilder.testnet.';
   el('create-btn').textContent = 'Refresh live state';
   el('refresh-btn').disabled = false;
   el('refresh-btn').textContent = 'Refresh chain';
   el('bounty-list').innerHTML = `<div class="live-market-list-label">COMPLETED TESTNET ROUND</div><div class="live-round-item"><span><b>${escapeHtml(round?.id || 'ROUND-01')}</b><small>allocation recorded</small></span><strong>${clearing} NEAR</strong></div>`;
   el('detail').innerHTML = `<div class="live-market-hero"><div><div class="detail-kicker">LIVE MARKET · ROUND 01 · SETTLED ON TESTNET</div><h2>Clearing price ${clearing} NEAR.</h2><p>Five buyers locked a 0.05 NEAR maximum. Five sealed worker bids were revealed and cleared cheapest-first at ${clearing} NEAR. All five allocations were paid on-chain.</p><div class="live-market-actions"><a class="primary" href="https://testnet.nearblocks.io/txns/${SETTLEMENT_TX}" target="_blank" rel="noreferrer">View settlement transaction <span>-&gt;</span></a><span class="status-tag settled">ALLOCATED</span></div></div><div class="live-savings-hero"><span>BUYERS SAVED</span><strong>${savings} <small>NEAR</small></strong><em>24% below the 0.05 NEAR max</em></div></div><div class="live-market-proof"><div><span>BUYERS</span><strong>${round?.demands?.length || 5}</strong><small>pooled demand</small></div><div><span>WORKERS</span><strong>${bids.length || 5}</strong><small>sealed bids</small></div><div><span>CLEARING</span><strong>${clearing}<small> NEAR</small></strong><small>cheapest-first rule</small></div><div><span>ALLOCATION</span><strong>${allocated}/${bids.length || 5}</strong><small>payments recorded</small></div></div><div class="live-round-flow"><span class="done">01 Demand pooled</span><span class="done">02 Bids sealed</span><span class="done">03 Bids revealed</span><span class="done">04 Cleared and allocated</span></div><div class="workspace-section-heading"><div><span class="panel-kicker">ALLOCATION RECORD</span><h3>Five worker payments</h3></div><p>One completed round · inspect the settlement proof</p></div><div class="table-wrap live-bids-table"><table class="agent-table simulation-table"><thead><tr><th>WORKER</th><th>COMMITMENT</th><th>QUALITY</th><th>PRICE</th><th>STATUS</th></tr></thead><tbody>${bids.map((bid) => `<tr><td><span class="agent-account">${escapeHtml(bid.seller)}</span><small>allocated unit</small></td><td><code class="hash">revealed on-chain</code></td><td>${escapeHtml(bid.quality)}</td><td>0.038 NEAR</td><td><span class="bid-state winner">ALLOCATED</span></td></tr>`).join('')}</tbody></table></div><div class="live-market-footer"><span><i class="evidence-dot verified"></i>Settlement recorded on NEAR testnet</span><span><a class="proof-link" href="https://testnet.nearblocks.io/txns/${SETTLEMENT_TX}" target="_blank" rel="noreferrer">View transaction -&gt;</a> <a class="proof-link" href="https://testnet.nearblocks.io/address/${COORDINATOR}" target="_blank" rel="noreferrer">View coordinator -&gt;</a> <a class="proof-link" href="swarm.html" rel="noreferrer">Run deterministic simulation -&gt;</a></span></div>`;
+  if (recorded) {
+    const kicker = el('detail').querySelector('.detail-kicker');
+    const copy = el('detail').querySelector('.live-market-hero p');
+    const footer = el('detail').querySelector('.live-market-footer');
+    if (kicker) kicker.textContent = 'RECORDED SNAPSHOT · FRESHNESS UNAVAILABLE';
+    if (copy) copy.textContent = `Five buyers locked a 0.05 NEAR maximum. This recorded snapshot is not a fresh coordinator read. Refresh after deployment to request current chain state.`;
+    if (footer) footer.querySelector('span').innerHTML = '<i class="evidence-dot recorded"></i>Recorded settlement reference · freshness unavailable';
+  }
 }
 
-function polishSettledMarketView() {
+async function fetchIntentDryRun(panel, clearingText, allocated) {
+  try {
+    const response = await fetch('https://swarm-api.duckdns.org/v1/intents/demo-quote', { headers: { Accept: 'application/json' } });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || `Backend ${response.status}`);
+    const result = payload.result || payload;
+    panel.querySelector('strong').textContent = 'Live 1Click dry quote returned';
+    panel.querySelector('small').textContent = `Native NEAR was used for this round. This is a dry quote only; no deposit or payment was made. ${allocated} allocated workers, ${clearingText}.`;
+    panel.querySelector('.intents-payload').textContent = JSON.stringify({ mode: result.mode || 'dry_quote', adapter: result.adapter || 'near-intents-1click', quote: result.result?.quote || result.result?.quoteId || result.result || null });
+  } catch (error) {
+    panel.querySelector('strong').textContent = 'Live Intents dry quote unavailable';
+    panel.querySelector('small').textContent = 'Native NEAR was used for this round. Configure the private backend Intents credentials to request a real quote; no quote is being represented here.';
+    panel.querySelector('.intents-payload').textContent = `Unavailable: ${error.message}`;
+  }
+}
+
+function polishSettledMarketView(round) {
   const detail = el('detail');
   const hero = detail?.querySelector('.live-market-hero');
   const savings = detail?.querySelector('.live-savings-hero');
   if (!detail || !hero || !savings) return;
+  const bids = round?.bids || [];
+  const allocated = round?.allocatedUnits || bids.filter((bid) => bid.allocated).length;
   hero.classList.add('settled-market-hero');
   const copy = hero.firstElementChild;
   if (copy && savings.parentElement !== copy) copy.prepend(savings);
@@ -307,28 +344,40 @@ function polishSettledMarketView() {
   const savingsNote = savings.querySelector('em');
   const clearingText = copy?.querySelector('h2')?.textContent.match(/[0-9.]+\s+NEAR/)?.[0] || '0.038 NEAR';
   if (savingsLabel) savingsLabel.textContent = 'BUYERS PAID';
-  if (savingsValue) savingsValue.innerHTML = '24%';
-  if (savingsNote) savingsNote.textContent = 'below their 0.05 NEAR maximum';
+  if (savingsValue) savingsValue.innerHTML = `${savingsPct}%`;
+  if (savingsNote) savingsNote.textContent = `below pooled buyer maximum · ${savings} NEAR saved`;
   const resultLine = document.createElement('p');
   resultLine.className = 'surplus-line';
-  resultLine.textContent = `${clearingText} · ${allocated} allocations paid · 0.06 NEAR total surplus`;
+  resultLine.textContent = `${clearingText} · ${allocated} allocations paid · ${savings} NEAR total surplus`;
   copy?.querySelector('.settlement-line')?.before(resultLine);
-  const checks = bids.length === 5 && bids.every((bid) => Number(bid.price) === 0.038 && bid.allocated);
+  const checks = Boolean(round?.verification?.ruleMatches && round?.verification?.allocationMatch);
   const verification = document.createElement('div');
   verification.className = 'browser-verification-panel';
-  verification.innerHTML = `<span class="panel-kicker">BROWSER RE-VERIFICATION</span><strong>${checks ? 'Clearing rule re-checked in this page' : 'Clearing rule check incomplete'}</strong><small>This page re-runs the cheapest-first rule against the on-chain bids and confirms every payment. ${checks ? '5/5 revealed bids match the 0.038 NEAR clearing price and 5/5 payments are allocated.' : 'Waiting for complete bid and payment data.'}</small>`;
+  verification.innerHTML = `<span class="panel-kicker">BROWSER RE-VERIFICATION</span><strong>${checks ? 'Cheapest-first rule re-checked from coordinator reads' : 'Coordinator rule check incomplete'}</strong><small>${checks ? `The page sorted ${round.verification.selectedCount} eligible bids by price, recomputed ${round.verification.computedClearing.toFixed(3)} NEAR, and matched the recorded allocation set.` : 'The page could not independently match the coordinator clearing and allocation records.'}</small>`;
   hero.after(verification);
   const table = detail.querySelector('.live-bids-table tbody');
-  if (table && !table.querySelector('.rejected-worker')) {
-    const row = document.createElement('tr');
-    row.className = 'rejected-worker';
-    row.innerHTML = '<td><span class="agent-account">worker-06</span><small>revealed bid</small></td><td><code class="hash">revealed on-chain</code></td><td>79</td><td>0.052 NEAR</td><td><span class="bid-state rejected">NOT ALLOCATED</span><small class="rejection-reason">Above clearing price</small></td>';
-    table.append(row);
+  const excluded = bids.find((bid) => !bid.allocated);
+  if (table) {
+    Array.from(table.querySelectorAll('tr')).forEach((row, index) => {
+      const bid = bids[index];
+      if (!bid) return;
+      const price = row.children[3];
+      const status = row.children[4];
+      if (price) price.textContent = `${bid.price.toFixed(3)} NEAR`;
+      if (status) status.innerHTML = bid.allocated ? '<span class="bid-state winner">ALLOCATED</span>' : '<span class="bid-state rejected">NOT ALLOCATED</span><small class="rejection-reason">Excluded by cheapest-first rule</small>';
+    });
+    if (!excluded) {
+      const note = document.createElement('tr');
+      note.className = 'guardrail-note';
+      note.innerHTML = '<td colspan="5"><small>No revealed bid was excluded in this settled round; all eligible bids were allocated.</small></td>';
+      table.append(note);
+    }
   }
   const intents = document.createElement('div');
   intents.className = 'intents-dry-run';
-  intents.innerHTML = `<span class="panel-kicker">NEAR INTENTS / DRY-RUN</span><strong>Intents quote artifact ready</strong><small>Native NEAR used for this round. The settlement route would send 0.038 NEAR to the five allocated workers through <code>/v1/intents/settle</code>.</small><code class="intents-payload">{ "asset": "near", "amount": "0.038", "recipients": 5, "mode": "dry-run" }</code>`;
+  intents.innerHTML = '<span class="panel-kicker">NEAR INTENTS / DRY-RUN</span><strong>Requesting a real dry quote…</strong><small>Native NEAR was used for this round. No credentials are exposed to the browser.</small><code class="intents-payload">Backend quote pending</code>';
   detail.querySelector('.live-market-footer')?.before(intents);
+  fetchIntentDryRun(intents, clearingText, allocated);
   detail.querySelector('.live-round-flow')?.remove();
   detail.querySelector('.simulation-flow')?.remove();
   const brief = copy?.querySelector('p');
@@ -344,7 +393,7 @@ function polishSettledMarketView() {
 }
 
 function renderSwarmSimulation() {
-  if (liveSwarm) { renderLiveCoordinatorRound(swarmState.rounds[swarmState.round - 1] || recordedCoordinatorRound); polishSettledMarketView(); return; }
+  if (liveSwarm) { const liveRound = swarmState.rounds[swarmState.round - 1] || recordedCoordinatorRound; renderLiveCoordinatorRound(liveRound); polishSettledMarketView(liveRound); return; }
   const round = swarmState.rounds[swarmState.round - 1];
   const phase = liveSwarm && round?.phase ? round.phase : swarmState.round === 0 ? 'Waiting to open round' : swarmState.round < 3 ? 'Commitments sealed' : swarmState.round === 3 ? 'Bids revealed' : 'Allocation cleared';
   const buyerCount = liveSwarm ? (round?.demands?.length || 0) : 20;
